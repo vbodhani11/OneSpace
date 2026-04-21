@@ -1,73 +1,62 @@
-# React + TypeScript + Vite
+# OneSpace ✦
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+**OneSpace** is a personal productivity app built for people who want one clean place to manage their tasks, journal their thoughts, and stay on top of their schedule — all wrapped in a beautiful dark space-themed UI.
 
-Currently, two official plugins are available:
+🔗 **Live App:** [https://onespaceapp.netlify.app](https://onespaceapp.netlify.app/login)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+---
 
-## React Compiler
+## What You Can Do
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **Dashboard** — See your active tasks floating in your personal space. Drag and drop tasks into the bin to mark them complete.
+- **Tasks** — Create, manage, and organize your tasks with priorities and due dates.
+- **Calendar** — Visualize your schedule and keep track of upcoming events.
+- **Journal** — Write private journal entries to capture thoughts, ideas, or daily reflections.
+- **Profile & Settings** — Customize your experience and manage your account.
+- **Invite System** — Invite others to collaborate in your space via a unique invite link.
 
-## Expanding the ESLint configuration
+---
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Tech Stack
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+| Layer | Technology |
+|---|---|
+| Frontend | React 19 + TypeScript |
+| Build Tool | Vite |
+| Styling | Tailwind CSS |
+| Animations | Framer Motion |
+| Drag & Drop | dnd-kit |
+| Backend & Auth | Supabase |
+| Forms | React Hook Form + Zod |
+| Routing | React Router v7 |
+| Deployment | Netlify |
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+---
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Project Structure
+
+```
+src/
+├── components/       # Reusable UI components
+├── contexts/         # Auth and Theme context providers
+├── hooks/            # Custom React hooks
+├── lib/              # Supabase client and utilities
+├── pages/            # App pages (Dashboard, Tasks, Calendar, Journal, etc.)
+├── types/            # TypeScript type definitions
+└── main.tsx          # App entry point
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+---
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Environment Variables
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+| Variable | Description |
+|---|---|
+| `VITE_SUPABASE_URL` | Supabase project URL |
+| `VITE_SUPABASE_ANON_KEY` | Supabase anonymous/public API key |
+
+---
+
+## License
+
+This project is private and not open for redistribution.
