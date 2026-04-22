@@ -39,7 +39,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         clearTimeout(timeout);
 
         if (_event === 'SIGNED_IN' && session?.user) {
-          await ensureProfile(session.user);
+          ensureProfile(session.user); // fire-and-forget — don't block the auth flow
         }
       }
     );

@@ -9,11 +9,11 @@ import { TaskBin } from '../components/dashboard/TaskBin';
 import { Modal } from '../components/ui/Modal';
 import { TaskForm } from '../components/tasks/TaskForm';
 import { Button } from '../components/ui/Button';
-import { LoadingState } from '../components/ui/Card';
+import { LoadingState, ErrorState } from '../components/ui/Card';
 
 export function Dashboard() {
   const { user } = useAuth();
-  const { tasks, loading, completeTask, createTask } = useTasks('active');
+  const { tasks, loading, error, fetchTasks, completeTask, createTask } = useTasks('active');
   const [isDragging, setIsDragging] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
 
@@ -123,6 +123,8 @@ export function Dashboard() {
       {/* ── Content ── */}
       {loading ? (
         <LoadingState />
+      ) : error ? (
+        <ErrorState message={error} onRetry={fetchTasks} />
       ) : (
         <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
           {tasks.length === 0 ? (
