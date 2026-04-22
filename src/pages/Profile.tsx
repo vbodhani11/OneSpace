@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { PageHeader } from '../components/layout/PageHeader';
 import {
@@ -44,6 +45,12 @@ function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) =>
 export function Profile() {
   const { user, signOut } = useAuth();
   const { theme, setTheme } = useTheme();
+  const navigate = useNavigate();
+
+  async function handleSignOut() {
+    await signOut();
+    navigate('/login', { replace: true });
+  }
 
   const [profile, setProfile]   = useState<ProfileType | null>(null);
   const [editing, setEditing]   = useState(false);
@@ -273,7 +280,7 @@ export function Profile() {
 
       {/* ── Sign out ──────────────────────────────────── */}
       <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.14 }}>
-        <Button variant="danger" onClick={signOut} className="w-full">
+        <Button variant="danger" onClick={handleSignOut} className="w-full">
           <LogOut size={16} />
           Sign out
         </Button>

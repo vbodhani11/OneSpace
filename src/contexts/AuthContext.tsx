@@ -21,10 +21,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Safety timeout — never leave the app stuck on loading
+    const timeout = setTimeout(() => setLoading(false), 5000);
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
+      clearTimeout(timeout);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -32,6 +36,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
+        clearTimeout(timeout);
 
         if (_event === 'SIGNED_IN' && session?.user) {
           await ensureProfile(session.user);
@@ -39,7 +44,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     );
 
-    return () => subscription.unsubscribe();
+    return () => {
+      clearTimeout(timeout);
+      subscription.unsubscribe();
+    };
   }, []);
 
   async function ensureProfile(user: User) {

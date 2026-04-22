@@ -6,11 +6,15 @@ import type { Task } from '../types/database';
 export function useTasks(statusFilter?: string) {
   const { user } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchTasks = useCallback(async () => {
-    if (!user) return;
+    if (!user) {
+      setTasks([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
 
