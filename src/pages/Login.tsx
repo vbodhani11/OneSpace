@@ -7,7 +7,19 @@ import { SpaceBackground } from '../components/dashboard/SpaceBackground';
 export function Login() {
   const { user, loading } = useAuth();
 
-  if (!loading && user) {
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}
+          className="w-10 h-10 border-2 border-accent-purple border-t-transparent rounded-full"
+        />
+      </div>
+    );
+  }
+
+  if (user) {
     return <Navigate to="/dashboard" replace />;
   }
 
