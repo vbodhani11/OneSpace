@@ -18,23 +18,33 @@ export function useTasks(statusFilter?: string) {
     setLoading(true);
     setError(null);
 
-    let query = supabase
-      .from('tasks')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
+    // Safety timeout — stop loading after 8s so the UI never hangs forever
+    const timeoutId = setTimeout(() => {
+      setLoading(false);
+      setError('Taking too long to load. Tap retry.');
+    }, 8000);
 
-    if (statusFilter) {
-      query = query.eq('status', statusFilter);
-    }
+    try {
+      let query = supabase
+        .from('tasks')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
 
-    const { data, error } = await query;
-    if (error) {
-      setError(error.message);
-    } else {
-      setTasks(data || []);
+      if (statusFilter) {
+        query = query.eq('status', statusFilter);
+      }
+
+      const { data, error } = await query;
+      if (error) {
+        setError(error.message);
+      } else {
+        setTasks(data || []);
+      }
+    } finally {
+      clearTimeout(timeoutId);
+      setLoading(false);
     }
-    setLoading(false);
   }, [user, statusFilter]);
 
   useEffect(() => {
