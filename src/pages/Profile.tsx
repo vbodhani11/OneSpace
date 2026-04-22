@@ -48,8 +48,11 @@ export function Profile() {
   const navigate = useNavigate();
 
   async function handleSignOut() {
-    await signOut();
-    navigate('/login', { replace: true });
+    try {
+      await signOut();
+    } finally {
+      navigate('/login', { replace: true });
+    }
   }
 
   const [profile, setProfile]   = useState<ProfileType | null>(null);
