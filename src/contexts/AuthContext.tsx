@@ -111,7 +111,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const pendingInvite = sessionStorage.getItem('pending-invite');
     const redirectTo = pendingInvite
       ? `${window.location.origin}/invite/${pendingInvite}`
-      : `${window.location.origin}/dashboard`;
+      : `${window.location.origin}/`;
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -121,6 +121,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function signOut() {
+    setUser(null);
+    setSession(null);
     await supabase.auth.signOut();
   }
 
