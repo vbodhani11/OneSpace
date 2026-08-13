@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabaseClient';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/useAuth';
 import type { JournalEntry } from '../types/database';
 
 export function useJournal() {
@@ -10,7 +10,11 @@ export function useJournal() {
   const [error, setError] = useState<string | null>(null);
 
   const fetchEntries = useCallback(async () => {
-    if (!user) return;
+    if (!user) {
+      setEntries([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
 
@@ -29,7 +33,8 @@ export function useJournal() {
   }, [user]);
 
   useEffect(() => {
-    fetchEntries();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void fetchEntries();
   }, [fetchEntries]);
 
   async function createEntry(entryData: {

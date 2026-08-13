@@ -1,11 +1,11 @@
 import { Navigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/useAuth';
 import { LoginForm } from '../components/auth/LoginForm';
 import { SpaceBackground } from '../components/dashboard/SpaceBackground';
 
 export function Login() {
-  const { user, loading } = useAuth();
+  const { user, loading, postLoginRedirect } = useAuth();
 
   if (loading) {
     return (
@@ -20,7 +20,7 @@ export function Login() {
   }
 
   if (user) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to={postLoginRedirect()} replace />;
   }
 
   return (

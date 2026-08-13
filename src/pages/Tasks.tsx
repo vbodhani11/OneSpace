@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, CheckSquare, Users, ArrowLeft, UserPlus, Trash2, Copy, Check as CheckIcon } from 'lucide-react';
+import { Plus, CheckSquare, Users, ArrowLeft, UserPlus, Trash2 } from 'lucide-react';
 import { PageHeader } from '../components/layout/PageHeader';
 import { useTasks } from '../hooks/useTasks';
 import { useTaskSpaces, useSpaceDetails } from '../hooks/useTaskSpaces';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/useAuth';
 import { TaskCard } from '../components/tasks/TaskCard';
 import { SharedSpaceCard } from '../components/tasks/SharedSpaceCard';
 import { InviteMemberModal } from '../components/tasks/InviteMemberModal';
@@ -12,9 +12,8 @@ import { CreateSpaceModal } from '../components/tasks/CreateSpaceModal';
 import { TaskForm } from '../components/tasks/TaskForm';
 import { Modal } from '../components/ui/Modal';
 import { Button } from '../components/ui/Button';
-import { EmptyState, LoadingState, ErrorState, PriorityBadge } from '../components/ui/Card';
+import { EmptyState, LoadingState, ErrorState } from '../components/ui/Card';
 import type { Task } from '../types/database';
-import { formatDate, truncate } from '../lib/utils';
 
 type Tab = 'personal' | 'spaces';
 type StatusFilter = 'all' | 'active' | 'completed';
@@ -59,7 +58,7 @@ export function Tasks() {
 }
 
 function PersonalTasksTab() {
-  const { tasks, loading, error, fetchTasks, createTask, updateTask, completeTask, deleteTask } = useTasks();
+  const { tasks, loading, error, fetchTasks, createTask, updateTask, toggleTask, deleteTask } = useTasks();
   const [createOpen, setCreateOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
 
@@ -106,9 +105,18 @@ function PersonalTasksTab() {
           <div key={task.id} className="mb-2">
             <TaskCard
               task={task}
-              onComplete={async (id) => { await completeTask(id); }}
-              onDelete={async (id) => { await deleteTask(id); }}
-              onUpdate={async (id, data) => { await updateTask(id, data as Partial<Task>); }}
+              onToggleComplete={async (id) => {
+                const result = await toggleTask(id);
+                if (result.error) throw result.error;
+              }}
+              onDelete={async (id) => {
+                const result = await deleteTask(id);
+                if (result.error) throw result.error;
+              }}
+              onUpdate={async (id, data) => {
+                const result = await updateTask(id, data as Partial<Task>);
+                if (result.error) throw result.error;
+              }}
             />
           </div>
         ))}
@@ -116,7 +124,11 @@ function PersonalTasksTab() {
 
       <Modal isOpen={createOpen} onClose={() => setCreateOpen(false)} title="New task">
         <TaskForm
-          onSubmit={async (data) => { await createTask(data); setCreateOpen(false); }}
+          onSubmit={async (data) => {
+            const result = await createTask(data);
+            if (result.error) throw result.error;
+            setCreateOpen(false);
+          }}
           onCancel={() => setCreateOpen(false)}
         />
       </Modal>
@@ -202,49 +214,36 @@ function SpaceDetailView({ spaceId, spaceName, spaceOwnerId, onBack }: {
   const [createTaskOpen, setCreateTaskOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
-  const [linkCopied, setLinkCopied] = useState(false);
 
   const isOwner = user?.id === spaceOwnerId;
   const canEdit = userRole === 'owner' || userRole === 'editor';
-
-  function copyInviteLink() {
-    navigator.clipboard.writeText(`${window.location.origin}/invite/${spaceId}`);
-    setLinkCopied(true);
-    setTimeout(() => setLinkCopied(false), 2500);
-  }
+  const acceptedMemberCount = members.filter((member) => member.status === 'accepted').length + 1;
+  const pendingInviteCount = members.filter((member) => member.status === 'invited').length;
 
   return (
     <div>
       <div className="flex items-center gap-3 mb-5">
-        <button onClick={onBack} className="p-2 rounded-xl hover:bg-white/10 text-white/60 transition-all">
+        <button aria-label="Back to shared spaces" onClick={onBack} className="p-2 rounded-xl hover:bg-white/10 text-white/60 transition-all">
           <ArrowLeft size={18} />
         </button>
         <div className="flex-1 min-w-0">
           <h2 className="text-lg font-bold text-white truncate">{spaceName}</h2>
-          <p className="text-xs text-white/40 capitalize">{userRole} · {members.length} member{members.length !== 1 ? 's' : ''}</p>
+          <p className="text-xs text-white/40 capitalize">
+            {userRole} · {acceptedMemberCount} member{acceptedMemberCount !== 1 ? 's' : ''}
+            {pendingInviteCount > 0 ? ` · ${pendingInviteCount} pending` : ''}
+          </p>
         </div>
         <div className="flex gap-2">
-          <button
-            onClick={copyInviteLink}
-            title="Copy invite link"
-            className={`p-2 rounded-xl border transition-all text-xs font-medium flex items-center gap-1 ${
-              linkCopied
-                ? 'bg-green-500/20 border-green-500/30 text-green-400'
-                : 'border-white/10 text-white/50 hover:text-white hover:bg-white/10'
-            }`}
-          >
-            {linkCopied ? <CheckIcon size={14} /> : <Copy size={14} />}
-          </button>
-          <Button size="sm" variant="secondary" onClick={() => setShowMembers((v) => !v)}>
+          <Button aria-label="Show members" size="sm" variant="secondary" onClick={() => setShowMembers((v) => !v)}>
             <Users size={14} />
           </Button>
           {isOwner && (
-            <Button size="sm" variant="secondary" onClick={() => setInviteOpen(true)}>
+            <Button aria-label="Invite member" size="sm" variant="secondary" onClick={() => setInviteOpen(true)}>
               <UserPlus size={14} />
             </Button>
           )}
           {canEdit && (
-            <Button size="sm" onClick={() => setCreateTaskOpen(true)}>
+            <Button aria-label="Add shared task" size="sm" onClick={() => setCreateTaskOpen(true)}>
               <Plus size={14} />
             </Button>
           )}
@@ -269,6 +268,7 @@ function SpaceDetailView({ spaceId, spaceName, spaceOwnerId, onBack }: {
                 {isOwner && (
                   <button
                     onClick={() => removeMember(m.id)}
+                    aria-label={`Remove ${m.email}`}
                     className="p-1.5 text-white/30 hover:text-red-400 transition-colors"
                   >
                     <Trash2 size={13} />
@@ -295,46 +295,35 @@ function SpaceDetailView({ spaceId, spaceName, spaceOwnerId, onBack }: {
       <AnimatePresence>
         {tasks.map((task) => (
           <div key={task.id} className="mb-2">
-            <motion.div
-              layout
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="glass-card p-4 hover:bg-white/8 transition-all"
-            >
-              <div className="flex items-start gap-3">
-                {canEdit && (
-                  <button
-                    onClick={() => updateSharedTask(task.id, { status: task.status === 'completed' ? 'active' : 'completed' })}
-                    className={`mt-0.5 flex-shrink-0 transition-colors ${task.status === 'completed' ? 'text-green-400' : 'text-white/30 hover:text-green-400'}`}
-                  >
-                    {task.status === 'completed' ? '✓' : '○'}
-                  </button>
-                )}
-                <div className="flex-1 min-w-0">
-                  <p className={`text-sm font-medium ${task.status === 'completed' ? 'line-through text-white/40' : 'text-white/90'}`}>
-                    {task.title}
-                  </p>
-                  {task.description && <p className="text-xs text-white/40 mt-0.5">{truncate(task.description, 80)}</p>}
-                  <div className="flex items-center gap-2 mt-1.5">
-                    <PriorityBadge priority={task.priority} />
-                    {task.due_date && <span className="text-[11px] text-white/30">{formatDate(task.due_date)}</span>}
-                  </div>
-                </div>
-                {canEdit && (
-                  <button onClick={() => deleteSharedTask(task.id)} className="p-1.5 text-white/30 hover:text-red-400 transition-colors">
-                    <Trash2 size={14} />
-                  </button>
-                )}
-              </div>
-            </motion.div>
+            <TaskCard
+              task={task}
+              showActions={canEdit}
+              onToggleComplete={canEdit ? async (id) => {
+                const result = await updateSharedTask(id, {
+                  status: task.status === 'completed' ? 'active' : 'completed',
+                });
+                if (result.error) throw result.error;
+              } : undefined}
+              onUpdate={canEdit ? async (id, data) => {
+                const result = await updateSharedTask(id, data);
+                if (result.error) throw result.error;
+              } : undefined}
+              onDelete={canEdit ? async (id) => {
+                const result = await deleteSharedTask(id);
+                if (result.error) throw result.error;
+              } : undefined}
+            />
           </div>
         ))}
       </AnimatePresence>
 
       <Modal isOpen={createTaskOpen} onClose={() => setCreateTaskOpen(false)} title="Add task">
         <TaskForm
-          onSubmit={async (data) => { await createSharedTask(data); setCreateTaskOpen(false); }}
+          onSubmit={async (data) => {
+            const result = await createSharedTask(data);
+            if (result.error) throw result.error;
+            setCreateTaskOpen(false);
+          }}
           onCancel={() => setCreateTaskOpen(false)}
         />
       </Modal>
@@ -342,8 +331,7 @@ function SpaceDetailView({ spaceId, spaceName, spaceOwnerId, onBack }: {
       <InviteMemberModal
         isOpen={inviteOpen}
         onClose={() => setInviteOpen(false)}
-        onInvite={async (email, role) => { await inviteMember(email, role, spaceName); }}
-        spaceId={spaceId}
+        onInvite={(email, role) => inviteMember(email, role)}
         spaceName={spaceName}
       />
     </div>

@@ -2,8 +2,16 @@ export function cn(...classes: (string | undefined | null | false | 0 | 0n)[]): 
   return classes.filter(Boolean).join(' ');
 }
 
+function parseDisplayDate(date: string | Date): Date {
+  if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    const [year, month, day] = date.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  }
+  return new Date(date);
+}
+
 export function formatDate(date: string | Date): string {
-  const d = new Date(date);
+  const d = parseDisplayDate(date);
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
@@ -21,6 +29,28 @@ export function formatDateTime(date: string | Date): string {
 export function formatTime(date: string | Date): string {
   const d = new Date(date);
   return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+}
+
+function padDatePart(value: number): string {
+  return String(value).padStart(2, '0');
+}
+
+export function toLocalDateKey(date: string | Date): string {
+  const value = new Date(date);
+  return [
+    value.getFullYear(),
+    padDatePart(value.getMonth() + 1),
+    padDatePart(value.getDate()),
+  ].join('-');
+}
+
+export function toDateTimeLocalValue(date: string | Date): string {
+  const value = new Date(date);
+  return `${toLocalDateKey(value)}T${padDatePart(value.getHours())}:${padDatePart(value.getMinutes())}`;
+}
+
+export function toUtcISOString(localDateTime: string): string {
+  return new Date(localDateTime).toISOString();
 }
 
 export function isToday(date: string | Date): boolean {

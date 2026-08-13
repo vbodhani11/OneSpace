@@ -35,7 +35,7 @@ export interface CreateEventForm {
   description?: string;
   start_time: string;
   end_time?: string;
-  event_type: string;
+  event_type: 'personal' | 'work' | 'health' | 'social' | 'other';
 }
 
 export interface CreateJournalForm {

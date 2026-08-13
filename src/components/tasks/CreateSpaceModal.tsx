@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, Mail, Plus, X, ChevronRight, ChevronLeft, Check, Copy, Link2 } from 'lucide-react';
+import { Users, Mail, Plus, X, ChevronRight, ChevronLeft, Check, AlertCircle } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Input, Textarea, Select } from '../ui/Input';
 import { Button } from '../ui/Button';
@@ -21,7 +21,11 @@ interface CreateSpaceModalProps {
     name: string,
     description: string,
     invitees: { email: string; role: Role }[]
-  ) => Promise<{ data?: { id: string } | null; error: Error | null }>;
+  ) => Promise<{
+    data?: { id: string } | null;
+    error: Error | null;
+    warning?: Error | null;
+  }>;
 }
 
 function isValidEmail(email: string) {
@@ -37,8 +41,8 @@ export function CreateSpaceModal({ isOpen, onClose, onCreate }: CreateSpaceModal
   const [roleInput, setRoleInput] = useState<Role>('editor');
   const [emailError, setEmailError] = useState('');
   const [creating, setCreating] = useState(false);
-  const [createdSpaceId, setCreatedSpaceId] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [createError, setCreateError] = useState('');
+  const [inviteWarning, setInviteWarning] = useState('');
 
   function reset() {
     setStep('details');
@@ -49,8 +53,8 @@ export function CreateSpaceModal({ isOpen, onClose, onCreate }: CreateSpaceModal
     setRoleInput('editor');
     setEmailError('');
     setCreating(false);
-    setCreatedSpaceId(null);
-    setCopied(false);
+    setCreateError('');
+    setInviteWarning('');
   }
 
   function handleClose() {
@@ -63,6 +67,7 @@ export function CreateSpaceModal({ isOpen, onClose, onCreate }: CreateSpaceModal
     if (!email) return;
     if (!isValidEmail(email)) { setEmailError('Enter a valid email address'); return; }
     if (invitees.find((i) => i.email === email)) { setEmailError('Already added'); return; }
+    if (invitees.length >= 10) { setEmailError('Invite up to 10 people at a time'); return; }
     setInvitees((prev) => [...prev, { email, role: roleInput, id: crypto.randomUUID() }]);
     setEmailInput('');
     setEmailError('');
@@ -79,23 +84,26 @@ export function CreateSpaceModal({ isOpen, onClose, onCreate }: CreateSpaceModal
   async function handleCreate() {
     if (!name.trim()) return;
     setCreating(true);
-    const result = await onCreate(
-      name.trim(),
-      description.trim(),
-      invitees.map(({ email, role }) => ({ email, role }))
-    );
-    setCreating(false);
-    if (!result?.error && result?.data) {
-      setCreatedSpaceId(result.data.id);
-      setStep('done');
+    setCreateError('');
+    try {
+      const result = await onCreate(
+        name.trim(),
+        description.trim(),
+        invitees.map(({ email, role }) => ({ email, role }))
+      );
+      if (result?.error) {
+        setCreateError(result.error.message || 'The space could not be created.');
+        return;
+      }
+      if (result?.data) {
+        setInviteWarning(result.warning?.message || '');
+        setStep('done');
+      }
+    } catch (error) {
+      setCreateError(error instanceof Error ? error.message : 'The space could not be created.');
+    } finally {
+      setCreating(false);
     }
-  }
-
-  function copyLink() {
-    if (!createdSpaceId) return;
-    navigator.clipboard.writeText(`${window.location.origin}/invite/${createdSpaceId}`);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2500);
   }
 
   const roleOptions = [
@@ -218,6 +226,7 @@ export function CreateSpaceModal({ isOpen, onClose, onCreate }: CreateSpaceModal
               </div>
               <button
                 onClick={addInvitee}
+                aria-label="Add invitee"
                 className="mb-0.5 p-2.5 rounded-xl bg-accent-purple/20 border border-accent-purple/30 text-accent-purple hover:bg-accent-purple/30 transition-all flex-shrink-0"
                 title="Add invitee"
               >
@@ -255,6 +264,7 @@ export function CreateSpaceModal({ isOpen, onClose, onCreate }: CreateSpaceModal
                       </div>
                       <button
                         onClick={() => removeInvitee(inv.id)}
+                        aria-label={`Remove ${inv.email}`}
                         className="p-1 text-white/30 hover:text-red-400 transition-colors flex-shrink-0"
                       >
                         <X size={14} />
@@ -268,6 +278,13 @@ export function CreateSpaceModal({ isOpen, onClose, onCreate }: CreateSpaceModal
             {invitees.length === 0 && (
               <p className="text-center text-white/25 text-xs py-4">
                 No invitees yet — you can also skip and invite later from inside the space.
+              </p>
+            )}
+
+            {createError && (
+              <p className="flex items-center gap-2 text-sm text-red-400">
+                <AlertCircle size={15} />
+                {createError}
               </p>
             )}
 
@@ -304,7 +321,11 @@ export function CreateSpaceModal({ isOpen, onClose, onCreate }: CreateSpaceModal
               <span className="text-white font-medium">{name}</span> is ready.
             </p>
 
-            {invitees.length > 0 ? (
+            {invitees.length > 0 && inviteWarning ? (
+              <p className="text-amber-300/80 text-xs mb-5">
+                The space and email-bound invitations were created, but {inviteWarning.toLowerCase()}
+              </p>
+            ) : invitees.length > 0 ? (
               <p className="text-white/40 text-xs mb-5">
                 Invites sent to {invitees.length} {invitees.length === 1 ? 'person' : 'people'}.
                 They'll get an email with a link to join.
@@ -313,30 +334,6 @@ export function CreateSpaceModal({ isOpen, onClose, onCreate }: CreateSpaceModal
               <p className="text-white/40 text-xs mb-5">
                 You can invite people any time from inside the space.
               </p>
-            )}
-
-            {/* Invite link */}
-            {createdSpaceId && (
-              <div className="mb-5">
-                <p className="text-xs text-white/40 mb-2 font-medium">Share this invite link</p>
-                <div className="flex items-center gap-2 p-2.5 glass-card rounded-xl text-left">
-                  <Link2 size={14} className="text-accent-purple flex-shrink-0" />
-                  <p className="text-xs text-white/60 truncate flex-1">
-                    {window.location.origin}/invite/{createdSpaceId}
-                  </p>
-                  <button
-                    onClick={copyLink}
-                    className={`flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-lg transition-all flex-shrink-0 ${
-                      copied
-                        ? 'bg-green-500/20 text-green-400'
-                        : 'bg-accent-purple/20 text-accent-purple hover:bg-accent-purple/30'
-                    }`}
-                  >
-                    {copied ? <Check size={12} /> : <Copy size={12} />}
-                    {copied ? 'Copied!' : 'Copy'}
-                  </button>
-                </div>
-              </div>
             )}
 
             <Button onClick={handleClose} className="w-full">

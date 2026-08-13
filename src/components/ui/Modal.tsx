@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useId } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 import { cn } from '../../lib/utils';
@@ -13,6 +13,7 @@ interface ModalProps {
 }
 
 export function Modal({ isOpen, onClose, title, children, size = 'md', className }: ModalProps) {
+  const titleId = useId();
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
@@ -50,6 +51,10 @@ export function Modal({ isOpen, onClose, title, children, size = 'md', className
             onClick={onClose}
           />
           <motion.div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={title ? titleId : undefined}
+            aria-label={title ? undefined : 'Dialog'}
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -62,9 +67,11 @@ export function Modal({ isOpen, onClose, title, children, size = 'md', className
           >
             {title && (
               <div className="flex items-center justify-between mb-5">
-                <h2 className="text-lg font-semibold text-white">{title}</h2>
+                <h2 id={titleId} className="text-lg font-semibold text-white">{title}</h2>
                 <button
+                  type="button"
                   onClick={onClose}
+                  aria-label={`Close ${title}`}
                   className="p-1.5 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-all"
                 >
                   <X size={18} />
@@ -73,7 +80,9 @@ export function Modal({ isOpen, onClose, title, children, size = 'md', className
             )}
             {!title && (
               <button
+                type="button"
                 onClick={onClose}
+                aria-label="Close dialog"
                 className="absolute top-4 right-4 p-1.5 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-all"
               >
                 <X size={18} />

@@ -1,7 +1,7 @@
 
 import { Navigate, Outlet } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../contexts/useAuth';
 
 export function ProtectedRoute() {
   const { user, loading } = useAuth();

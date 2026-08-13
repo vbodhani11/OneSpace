@@ -1,29 +1,10 @@
-import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../lib/supabaseClient';
-import { useAuth } from './AuthContext';
-
-type Theme = 'dark' | 'light' | 'system';
-
-interface ThemeContextType {
-  theme: Theme;
-  resolvedTheme: 'dark' | 'light';
-  setTheme: (theme: Theme) => Promise<void>;
-}
-
-const ThemeContext = createContext<ThemeContextType>({
-  theme: 'dark',
-  resolvedTheme: 'dark',
-  setTheme: async () => {},
-});
+import { useAuth } from './useAuth';
+import { ThemeContext, type Theme } from './useTheme';
 
 function getSystemTheme(): 'dark' | 'light' {
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-}
-
-function applyTheme(theme: Theme) {
-  const resolved = theme === 'system' ? getSystemTheme() : theme;
-  document.documentElement.setAttribute('data-theme', resolved);
-  return resolved;
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
@@ -32,22 +13,19 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const saved = localStorage.getItem('onespace-theme') as Theme | null;
     return saved || 'dark';
   });
-  const [resolvedTheme, setResolvedTheme] = useState<'dark' | 'light'>('dark');
+  const [systemTheme, setSystemTheme] = useState<'dark' | 'light'>(getSystemTheme);
+  const resolvedTheme = theme === 'system' ? systemTheme : theme;
 
-  // Apply theme on mount and whenever theme changes
+  // Apply the derived theme without mirroring it into another state variable.
   useEffect(() => {
-    const resolved = applyTheme(theme);
-    setResolvedTheme(resolved);
-  }, [theme]);
+    document.documentElement.setAttribute('data-theme', resolvedTheme);
+  }, [resolvedTheme]);
 
   // Listen for system theme changes when theme === 'system'
   useEffect(() => {
     if (theme !== 'system') return;
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
-    const handler = () => {
-      const resolved = applyTheme('system');
-      setResolvedTheme(resolved);
-    };
+    const handler = () => setSystemTheme(getSystemTheme());
     mq.addEventListener('change', handler);
     return () => mq.removeEventListener('change', handler);
   }, [theme]);
@@ -99,8 +77,4 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       {children}
     </ThemeContext.Provider>
   );
-}
-
-export function useTheme() {
-  return useContext(ThemeContext);
 }

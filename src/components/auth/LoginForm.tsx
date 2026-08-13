@@ -5,7 +5,7 @@ import { Mail, Lock } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../contexts/useAuth';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 

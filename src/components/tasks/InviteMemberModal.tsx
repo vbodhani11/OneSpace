@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { UserPlus, Mail, Link2, Copy, Check } from 'lucide-react';
+import { UserPlus, Mail } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Input, Select } from '../ui/Input';
 import { Button } from '../ui/Button';
@@ -17,13 +17,14 @@ type InviteFormData = z.infer<typeof inviteSchema>;
 interface InviteMemberModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onInvite: (email: string, role: 'editor' | 'viewer') => Promise<void>;
-  spaceId?: string;
+  onInvite: (
+    email: string,
+    role: 'editor' | 'viewer',
+  ) => Promise<{ error: Error | null }>;
   spaceName?: string;
 }
 
-export function InviteMemberModal({ isOpen, onClose, onInvite, spaceId, spaceName }: InviteMemberModalProps) {
-  const [copied, setCopied] = useState(false);
+export function InviteMemberModal({ isOpen, onClose, onInvite, spaceName }: InviteMemberModalProps) {
   const [inviteError, setInviteError] = useState('');
 
   const {
@@ -39,19 +40,16 @@ export function InviteMemberModal({ isOpen, onClose, onInvite, spaceId, spaceNam
   async function onSubmit(data: InviteFormData) {
     setInviteError('');
     try {
-      await onInvite(data.email, data.role);
+      const result = await onInvite(data.email, data.role);
+      if (result.error) {
+        setInviteError(result.error.message);
+        return;
+      }
       reset();
       onClose();
     } catch (err: unknown) {
       setInviteError(err instanceof Error ? err.message : 'Failed to invite member');
     }
-  }
-
-  function copyLink() {
-    if (!spaceId) return;
-    navigator.clipboard.writeText(`${window.location.origin}/invite/${spaceId}`);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2500);
   }
 
   return (
@@ -94,31 +92,6 @@ export function InviteMemberModal({ isOpen, onClose, onInvite, spaceId, spaceNam
           </Button>
         </div>
       </form>
-
-      {spaceId && (
-        <div className="mt-4 pt-4 border-t border-white/8">
-          <p className="text-xs text-white/35 mb-2 font-medium flex items-center gap-1.5">
-            <Link2 size={12} />
-            Or share invite link
-          </p>
-          <div className="flex items-center gap-2 p-2.5 glass-card rounded-xl">
-            <p className="text-xs text-white/50 truncate flex-1">
-              {window.location.origin}/invite/{spaceId}
-            </p>
-            <button
-              onClick={copyLink}
-              className={`flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-lg transition-all flex-shrink-0 ${
-                copied
-                  ? 'bg-green-500/20 text-green-400'
-                  : 'bg-accent-purple/20 text-accent-purple hover:bg-accent-purple/30'
-              }`}
-            >
-              {copied ? <Check size={12} /> : <Copy size={12} />}
-              {copied ? 'Copied!' : 'Copy'}
-            </button>
-          </div>
-        </div>
-      )}
     </Modal>
   );
 }

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabaseClient';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/useAuth';
 import type { Task } from '../types/database';
 
 export function useTasks(statusFilter?: string) {
@@ -48,7 +48,8 @@ export function useTasks(statusFilter?: string) {
   }, [user, statusFilter]);
 
   useEffect(() => {
-    fetchTasks();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void fetchTasks();
   }, [fetchTasks]);
 
   async function createTask(taskData: {
@@ -94,14 +95,25 @@ export function useTasks(statusFilter?: string) {
     return { error: error as Error | null };
   }
 
-  async function completeTask(id: string) {
-    const { error } = await supabase
-      .from('tasks')
-      .update({ status: 'completed', updated_at: new Date().toISOString() })
-      .eq('id', id);
+  async function toggleTask(id: string) {
+    const currentTask = tasks.find((task) => task.id === id);
+    if (!currentTask) return { error: new Error('Task not found') };
 
-    if (!error) {
-      setTasks((prev) => prev.filter((t) => t.id !== id));
+    const nextStatus = currentTask.status === 'completed' ? 'active' : 'completed';
+    const { data, error } = await supabase
+      .from('tasks')
+      .update({ status: nextStatus, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (!error && data) {
+      setTasks((prev) => {
+        if (statusFilter && data.status !== statusFilter) {
+          return prev.filter((task) => task.id !== id);
+        }
+        return prev.map((task) => (task.id === id ? data : task));
+      });
     }
     return { error: error as Error | null };
   }
@@ -126,5 +138,5 @@ export function useTasks(statusFilter?: string) {
     }
   }
 
-  return { tasks, loading, error, fetchTasks, createTask, updateTask, completeTask, deleteTask, clearCompleted };
+  return { tasks, loading, error, fetchTasks, createTask, updateTask, toggleTask, deleteTask, clearCompleted };
 }

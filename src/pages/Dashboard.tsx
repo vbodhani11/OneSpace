@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { DndContext, type DragEndEvent, type DragStartEvent, useSensor, useSensors, PointerSensor } from '@dnd-kit/core';
+import { DndContext, type DragEndEvent, useSensor, useSensors, PointerSensor } from '@dnd-kit/core';
 import { Plus, Sparkles, Rocket } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/useAuth';
 import { useTasks } from '../hooks/useTasks';
 import { FloatingTask } from '../components/dashboard/FloatingTask';
 import { TaskBin } from '../components/dashboard/TaskBin';
@@ -13,15 +13,16 @@ import { LoadingState, ErrorState } from '../components/ui/Card';
 
 export function Dashboard() {
   const { user } = useAuth();
-  const { tasks, loading, error, fetchTasks, completeTask, createTask } = useTasks('active');
+  const { tasks, loading, error, fetchTasks, toggleTask, createTask } = useTasks('active');
   const [isDragging, setIsDragging] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [actionError, setActionError] = useState('');
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
   );
 
-  function handleDragStart(_event: DragStartEvent): void {
+  function handleDragStart(): void {
     setIsDragging(true);
   }
 
@@ -29,7 +30,9 @@ export function Dashboard() {
     setIsDragging(false);
     const { active, over } = event;
     if (over?.id === 'task-bin') {
-      await completeTask(active.id as string);
+      setActionError('');
+      const result = await toggleTask(active.id as string);
+      if (result.error) setActionError(result.error.message);
     }
   }
 
@@ -121,6 +124,12 @@ export function Dashboard() {
       </div>
 
       {/* ── Content ── */}
+      {actionError && (
+        <p role="alert" className="mb-4 rounded-xl border border-red-500/30 bg-red-500/15 p-3 text-sm text-red-400">
+          {actionError}
+        </p>
+      )}
+
       {loading ? (
         <LoadingState />
       ) : error ? (
@@ -181,7 +190,8 @@ export function Dashboard() {
       <Modal isOpen={createOpen} onClose={() => setCreateOpen(false)} title="New task">
         <TaskForm
           onSubmit={async (data) => {
-            await createTask(data);
+            const result = await createTask(data);
+            if (result.error) throw result.error;
             setCreateOpen(false);
           }}
           onCancel={() => setCreateOpen(false)}

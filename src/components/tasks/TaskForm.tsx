@@ -1,4 +1,5 @@
 
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -13,16 +14,19 @@ const taskSchema = z.object({
   due_date: z.string().optional(),
 });
 
-type TaskFormData = z.infer<typeof taskSchema>;
+export type TaskFormData = z.infer<typeof taskSchema>;
+
+type TaskFormInitialData = Partial<Pick<Task, 'title' | 'description' | 'priority' | 'due_date'>>;
 
 interface TaskFormProps {
-  initialData?: Partial<Task>;
+  initialData?: TaskFormInitialData;
   onSubmit: (data: TaskFormData) => Promise<void>;
   onCancel: () => void;
   submitLabel?: string;
 }
 
 export function TaskForm({ initialData, onSubmit, onCancel, submitLabel = 'Create task' }: TaskFormProps) {
+  const [submitError, setSubmitError] = useState('');
   const {
     register,
     handleSubmit,
@@ -37,8 +41,17 @@ export function TaskForm({ initialData, onSubmit, onCancel, submitLabel = 'Creat
     },
   });
 
+  async function submitForm(data: TaskFormData) {
+    setSubmitError('');
+    try {
+      await onSubmit(data);
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : 'The task could not be saved.');
+    }
+  }
+
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+    <form onSubmit={handleSubmit(submitForm)} className="space-y-4">
       <Input
         label="Title"
         placeholder="What needs to be done?"
@@ -67,6 +80,11 @@ export function TaskForm({ initialData, onSubmit, onCancel, submitLabel = 'Creat
           {...register('due_date')}
         />
       </div>
+
+      {submitError && (
+        <p role="alert" className="text-sm text-red-400">{submitError}</p>
+      )}
+
       <div className="flex gap-3 pt-2">
         <Button type="button" variant="secondary" onClick={onCancel} className="flex-1">
           Cancel

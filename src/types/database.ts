@@ -35,8 +35,13 @@ export interface TaskSpaceMember {
   space_id: string;
   user_id: string | null;
   email: string;
-  role: 'owner' | 'editor' | 'viewer';
+  role: 'editor' | 'viewer';
   status: 'invited' | 'accepted' | 'removed';
+  invite_token: string | null;
+  expires_at: string | null;
+  accepted_at: string | null;
+  last_invited_at: string | null;
+  invite_send_count: number;
   created_at: string;
 }
 
@@ -71,7 +76,7 @@ export interface CalendarEvent {
   description: string | null;
   start_time: string;
   end_time: string | null;
-  event_type: string;
+  event_type: 'personal' | 'work' | 'health' | 'social' | 'other';
   created_at: string;
   updated_at: string;
 }
@@ -106,7 +111,17 @@ export type Database = {
       };
       task_space_members: {
         Row: TaskSpaceMember;
-        Insert: Omit<TaskSpaceMember, 'id' | 'created_at'> & { id?: string };
+        Insert: Omit<
+          TaskSpaceMember,
+          'id' | 'created_at' | 'invite_token' | 'expires_at' | 'accepted_at' | 'last_invited_at' | 'invite_send_count'
+        > & {
+          id?: string;
+          invite_token?: string | null;
+          expires_at?: string | null;
+          accepted_at?: string | null;
+          last_invited_at?: string | null;
+          invite_send_count?: number;
+        };
         Update: Partial<TaskSpaceMember>;
       };
       shared_tasks: {

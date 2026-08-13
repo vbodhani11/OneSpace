@@ -16,6 +16,13 @@ export function Journal() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editEntry, setEditEntry] = useState<JournalEntry | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState('');
+
+  async function removeEntry(id: string) {
+    setActionError('');
+    const result = await deleteEntry(id);
+    if (result.error) setActionError(result.error.message);
+  }
 
   return (
     <div>
@@ -32,6 +39,11 @@ export function Journal() {
 
       {loading && <LoadingState />}
       {error && <ErrorState message={error} onRetry={fetchEntries} />}
+      {actionError && (
+        <p role="alert" className="mb-4 rounded-xl border border-red-500/30 bg-red-500/15 p-3 text-sm text-red-400">
+          {actionError}
+        </p>
+      )}
 
       {!loading && !error && entries.length === 0 && (
         <EmptyState
@@ -74,12 +86,14 @@ export function Journal() {
                   <TextToSpeechButton text={entry.content} />
                   <button
                     onClick={() => setEditEntry(entry)}
+                    aria-label={`Edit ${entry.title || 'journal entry'}`}
                     className="p-1.5 text-white/30 hover:text-white/70 hover:bg-white/10 rounded-lg transition-all"
                   >
                     <Edit2 size={14} />
                   </button>
                   <button
-                    onClick={() => deleteEntry(entry.id)}
+                    onClick={() => void removeEntry(entry.id)}
+                    aria-label={`Delete ${entry.title || 'journal entry'}`}
                     className="p-1.5 text-white/30 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
                   >
                     <Trash2 size={14} />
@@ -106,7 +120,11 @@ export function Journal() {
 
       <Modal isOpen={createOpen} onClose={() => setCreateOpen(false)} title="New journal entry" size="lg">
         <JournalEditor
-          onSubmit={async (data) => { await createEntry(data); setCreateOpen(false); }}
+          onSubmit={async (data) => {
+            const result = await createEntry(data);
+            if (result.error) throw result.error;
+            setCreateOpen(false);
+          }}
           onCancel={() => setCreateOpen(false)}
         />
       </Modal>
@@ -115,7 +133,11 @@ export function Journal() {
         {editEntry && (
           <JournalEditor
             initialData={editEntry}
-            onSubmit={async (data) => { await updateEntry(editEntry.id, data); setEditEntry(null); }}
+            onSubmit={async (data) => {
+              const result = await updateEntry(editEntry.id, data);
+              if (result.error) throw result.error;
+              setEditEntry(null);
+            }}
             onCancel={() => setEditEntry(null)}
             submitLabel="Update entry"
           />

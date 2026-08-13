@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabaseClient';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/useAuth';
 import type { CalendarEvent } from '../types/database';
+import { toLocalDateKey, toUtcISOString } from '../lib/utils';
 
 export function useCalendar() {
   const { user } = useAuth();
@@ -10,7 +11,11 @@ export function useCalendar() {
   const [error, setError] = useState<string | null>(null);
 
   const fetchEvents = useCallback(async () => {
-    if (!user) return;
+    if (!user) {
+      setEvents([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
 
@@ -29,7 +34,8 @@ export function useCalendar() {
   }, [user]);
 
   useEffect(() => {
-    fetchEvents();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void fetchEvents();
   }, [fetchEvents]);
 
   async function createEvent(eventData: {
@@ -47,8 +53,8 @@ export function useCalendar() {
         user_id: user.id,
         title: eventData.title,
         description: eventData.description || null,
-        start_time: eventData.start_time,
-        end_time: eventData.end_time || null,
+        start_time: toUtcISOString(eventData.start_time),
+        end_time: eventData.end_time ? toUtcISOString(eventData.end_time) : null,
         event_type: eventData.event_type || 'personal',
       })
       .select()
@@ -61,15 +67,26 @@ export function useCalendar() {
   }
 
   async function updateEvent(id: string, updates: Partial<CalendarEvent>) {
+    const hasEndTimeUpdate = Object.prototype.hasOwnProperty.call(updates, 'end_time');
+    const normalizedUpdates = {
+      ...updates,
+      ...(updates.start_time ? { start_time: toUtcISOString(updates.start_time) } : {}),
+      ...(hasEndTimeUpdate
+        ? { end_time: updates.end_time ? toUtcISOString(updates.end_time) : null }
+        : {}),
+      updated_at: new Date().toISOString(),
+    };
     const { data, error } = await supabase
       .from('calendar_events')
-      .update({ ...updates, updated_at: new Date().toISOString() })
+      .update(normalizedUpdates)
       .eq('id', id)
       .select()
       .single();
 
     if (!error && data) {
-      setEvents((prev) => prev.map((e) => (e.id === id ? data : e)));
+      setEvents((prev) => prev
+        .map((e) => (e.id === id ? data : e))
+        .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()));
     }
     return { error: error as Error | null };
   }
@@ -84,8 +101,7 @@ export function useCalendar() {
 
   function getEventsForDate(date: string): CalendarEvent[] {
     return events.filter((e) => {
-      const eventDate = new Date(e.start_time).toISOString().split('T')[0];
-      return eventDate === date;
+      return toLocalDateKey(e.start_time) === date;
     });
   }
 

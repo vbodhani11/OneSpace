@@ -8,10 +8,11 @@ import { EventForm } from '../components/calendar/EventForm';
 import { Modal } from '../components/ui/Modal';
 import { LoadingState, ErrorState } from '../components/ui/Card';
 import type { CalendarEvent } from '../types/database';
+import { toLocalDateKey } from '../lib/utils';
 
 export function Calendar() {
-  const { events, loading, error, fetchEvents, createEvent, updateEvent, deleteEvent } = useCalendar();
-  const today = new Date().toISOString().split('T')[0];
+  const { events, loading, error, fetchEvents, createEvent, updateEvent, deleteEvent, getEventsForDate } = useCalendar();
+  const today = toLocalDateKey(new Date());
   const [selectedDate, setSelectedDate] = useState(today);
   const [createOpen, setCreateOpen] = useState(false);
   const [editEvent, setEditEvent] = useState<CalendarEvent | null>(null);
@@ -38,9 +39,10 @@ export function Calendar() {
             events={events}
             selectedDate={selectedDate}
             onSelectDate={setSelectedDate}
+            onSelectEvent={setEditEvent}
           />
 
-          {events.filter((e) => e.start_time.startsWith(selectedDate)).length === 0 && (
+          {getEventsForDate(selectedDate).length === 0 && (
             <div className="text-center py-8">
               <CalendarIcon size={32} className="text-white/20 mx-auto mb-3" />
               <p className="text-white/30 text-sm">No events on this day</p>
@@ -59,7 +61,8 @@ export function Calendar() {
         <EventForm
           defaultDate={selectedDate}
           onSubmit={async (data) => {
-            await createEvent({ ...data, start_time: data.start_time, end_time: data.end_time || undefined });
+            const result = await createEvent({ ...data, end_time: data.end_time || undefined });
+            if (result.error) throw result.error;
             setCreateOpen(false);
           }}
           onCancel={() => setCreateOpen(false)}
@@ -71,11 +74,16 @@ export function Calendar() {
           <EventForm
             initialData={editEvent}
             onSubmit={async (data) => {
-              await updateEvent(editEvent.id, { ...data, start_time: data.start_time, end_time: data.end_time || undefined });
+              const result = await updateEvent(editEvent.id, { ...data, end_time: data.end_time || null });
+              if (result.error) throw result.error;
               setEditEvent(null);
             }}
             onCancel={() => setEditEvent(null)}
-            onDelete={async () => { await deleteEvent(editEvent.id); setEditEvent(null); }}
+            onDelete={async () => {
+              const result = await deleteEvent(editEvent.id);
+              if (result.error) throw result.error;
+              setEditEvent(null);
+            }}
             submitLabel="Update event"
           />
         )}
