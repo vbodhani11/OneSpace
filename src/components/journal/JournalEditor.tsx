@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -27,6 +28,7 @@ interface JournalEditorProps {
 }
 
 export function JournalEditor({ initialData, onSubmit, onCancel, submitLabel = 'Save entry' }: JournalEditorProps) {
+  const [submitError, setSubmitError] = useState('');
   const {
     register,
     handleSubmit,
@@ -50,13 +52,22 @@ export function JournalEditor({ initialData, onSubmit, onCancel, submitLabel = '
     setValue('content', current + (current ? ' ' : '') + text);
   }
 
+  async function submitForm(data: JournalFormData) {
+    setSubmitError('');
+    try {
+      await onSubmit(data);
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : 'The journal entry could not be saved.');
+    }
+  }
+
   const moodOptions = [{ value: '', label: 'Select mood (optional)' }, ...moods.map((m) => ({ value: m, label: m }))];
 
   return (
     <motion.form
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      onSubmit={handleSubmit(onSubmit)}
+      onSubmit={handleSubmit(submitForm)}
       className="space-y-4"
     >
       <div className="grid grid-cols-2 gap-3">
@@ -94,6 +105,10 @@ export function JournalEditor({ initialData, onSubmit, onCancel, submitLabel = '
           {...register('content')}
         />
       </div>
+
+      {submitError && (
+        <p role="alert" className="text-sm text-red-400">{submitError}</p>
+      )}
 
       <div className="flex gap-3 pt-2">
         <Button type="button" variant="secondary" onClick={onCancel} className="flex-1">

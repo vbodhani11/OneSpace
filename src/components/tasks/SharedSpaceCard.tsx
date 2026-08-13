@@ -17,11 +17,20 @@ export function SharedSpaceCard({ space, onClick, onDelete }: SharedSpaceCardPro
 
   return (
     <motion.div
+      role="button"
+      tabIndex={0}
+      aria-label={`Open ${space.name}`}
       layout
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       className="glass-card p-4 hover:bg-white/8 transition-all duration-200 cursor-pointer group"
       onClick={onClick}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onClick();
+        }
+      }}
     >
       <div className="flex items-start gap-3">
         <div className="w-10 h-10 rounded-xl bg-btn-primary flex items-center justify-center flex-shrink-0 shadow-glow">
@@ -40,7 +49,9 @@ export function SharedSpaceCard({ space, onClick, onDelete }: SharedSpaceCardPro
         <div className="flex items-center gap-1 flex-shrink-0">
           {isOwner && onDelete && (
             <button
+              type="button"
               onClick={(e) => { e.stopPropagation(); onDelete(space.id); }}
+              aria-label={`Delete ${space.name}`}
               className="p-1.5 opacity-0 group-hover:opacity-100 text-white/30 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
             >
               <Trash2 size={14} />

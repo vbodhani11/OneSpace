@@ -8,20 +8,30 @@ import { Modal } from '../ui/Modal';
 import { TaskForm } from './TaskForm';
 
 interface TaskCardProps {
-  task: Task;
-  onComplete?: (id: string) => Promise<void>;
+  task: Pick<Task, 'id' | 'title' | 'description' | 'status' | 'priority' | 'due_date'>;
+  onToggleComplete?: (id: string) => Promise<void>;
   onDelete?: (id: string) => Promise<void>;
-  onUpdate?: (id: string, data: Partial<Task>) => Promise<void>;
+  onUpdate?: (id: string, data: Partial<Pick<Task, 'title' | 'description' | 'priority' | 'due_date'>>) => Promise<void>;
   showActions?: boolean;
 }
 
-export function TaskCard({ task, onComplete, onDelete, onUpdate, showActions = true }: TaskCardProps) {
+export function TaskCard({ task, onToggleComplete, onDelete, onUpdate, showActions = true }: TaskCardProps) {
   const [editOpen, setEditOpen] = useState(false);
+  const [actionError, setActionError] = useState('');
 
   async function handleEdit(data: Partial<Task>) {
     if (onUpdate) {
       await onUpdate(task.id, data);
       setEditOpen(false);
+    }
+  }
+
+  async function runAction(action: () => Promise<void>, fallbackMessage: string) {
+    setActionError('');
+    try {
+      await action();
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : fallbackMessage);
     }
   }
 
@@ -35,9 +45,14 @@ export function TaskCard({ task, onComplete, onDelete, onUpdate, showActions = t
         className="glass-card p-4 hover:bg-white/8 transition-all duration-200"
       >
         <div className="flex items-start gap-3">
-          {onComplete && (
+          {onToggleComplete && (
             <button
-              onClick={() => onComplete(task.id)}
+              type="button"
+              onClick={() => void runAction(
+                () => onToggleComplete(task.id),
+                'The task status could not be changed.',
+              )}
+              aria-label={task.status === 'completed' ? `Mark ${task.title} active` : `Complete ${task.title}`}
               className="mt-0.5 text-white/30 hover:text-green-400 transition-colors flex-shrink-0"
             >
               {task.status === 'completed' ? (
@@ -72,7 +87,9 @@ export function TaskCard({ task, onComplete, onDelete, onUpdate, showActions = t
             <div className="flex items-center gap-1 flex-shrink-0">
               {onUpdate && (
                 <button
+                  type="button"
                   onClick={() => setEditOpen(true)}
+                  aria-label={`Edit ${task.title}`}
                   className="p-1.5 text-white/30 hover:text-white/70 hover:bg-white/10 rounded-lg transition-all"
                 >
                   <Edit2 size={14} />
@@ -80,7 +97,12 @@ export function TaskCard({ task, onComplete, onDelete, onUpdate, showActions = t
               )}
               {onDelete && (
                 <button
-                  onClick={() => onDelete(task.id)}
+                  type="button"
+                  onClick={() => void runAction(
+                    () => onDelete(task.id),
+                    'The task could not be deleted.',
+                  )}
+                  aria-label={`Delete ${task.title}`}
                   className="p-1.5 text-white/30 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
                 >
                   <Trash2 size={14} />
@@ -89,6 +111,10 @@ export function TaskCard({ task, onComplete, onDelete, onUpdate, showActions = t
             </div>
           )}
         </div>
+
+        {actionError && (
+          <p role="alert" className="mt-3 text-sm text-red-400">{actionError}</p>
+        )}
       </motion.div>
 
       <Modal isOpen={editOpen} onClose={() => setEditOpen(false)} title="Edit task">

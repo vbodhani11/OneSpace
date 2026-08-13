@@ -2,8 +2,16 @@ export function cn(...classes: (string | undefined | null | false | 0 | 0n)[]): 
   return classes.filter(Boolean).join(' ');
 }
 
+function parseDisplayDate(date: string | Date): Date {
+  if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    const [year, month, day] = date.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  }
+  return new Date(date);
+}
+
 export function formatDate(date: string | Date): string {
-  const d = new Date(date);
+  const d = parseDisplayDate(date);
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
