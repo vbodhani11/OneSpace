@@ -23,6 +23,28 @@ export function formatTime(date: string | Date): string {
   return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 }
 
+function padDatePart(value: number): string {
+  return String(value).padStart(2, '0');
+}
+
+export function toLocalDateKey(date: string | Date): string {
+  const value = new Date(date);
+  return [
+    value.getFullYear(),
+    padDatePart(value.getMonth() + 1),
+    padDatePart(value.getDate()),
+  ].join('-');
+}
+
+export function toDateTimeLocalValue(date: string | Date): string {
+  const value = new Date(date);
+  return `${toLocalDateKey(value)}T${padDatePart(value.getHours())}:${padDatePart(value.getMinutes())}`;
+}
+
+export function toUtcISOString(localDateTime: string): string {
+  return new Date(localDateTime).toISOString();
+}
+
 export function isToday(date: string | Date): boolean {
   const d = new Date(date);
   const today = new Date();

@@ -13,7 +13,7 @@
 - **Calendar** — Visualize your schedule and keep track of upcoming events.
 - **Journal** — Write private journal entries to capture thoughts, ideas, or daily reflections.
 - **Profile & Settings** — Customize your experience and manage your account.
-- **Invite System** — Invite others to collaborate in your space via a unique invite link.
+- **Invite System** — Invite collaborators with email-bound links that expire after seven days.
 
 ---
 
@@ -55,8 +55,31 @@ src/
 | `VITE_SUPABASE_URL` | Supabase project URL |
 | `VITE_SUPABASE_ANON_KEY` | Supabase anonymous/public API key |
 
+The `send-space-invite` Edge Function also requires `RESEND_API_KEY`. Set `APP_URL`
+and `RESEND_FROM_EMAIL` for the deployed environment instead of relying on local
+defaults.
+
+---
+
+## Development checks
+
+```bash
+npm ci
+npm run check
+```
+
+`npm run check` runs ESLint, the Vitest security/UI suite, TypeScript, and the
+production build. GitHub Actions runs the same command for every pull request.
+
+## Database changes
+
+Supabase schema changes are versioned under `supabase/migrations`. Apply the
+collaboration-security migration before deploying frontend code that uses tokenized
+invitations. Review and test it in a local or preview database first; do not apply it
+directly to production without a backup and rollout plan.
+
 ---
 
 ## License
 
-This project is private and not open for redistribution.
+No license is granted for redistribution.

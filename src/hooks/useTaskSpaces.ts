@@ -1,7 +1,34 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
-import { useAuth } from '../contexts/AuthContext';
-import type { TaskSpace, TaskSpaceMember, SharedTask } from '../types/database';
+import { useAuth } from '../contexts/useAuth';
+import type { SharedTask, TaskSpace, TaskSpaceMember } from '../types/database';
+
+type CollaboratorRole = 'editor' | 'viewer';
+
+interface InviteFunctionResponse {
+  ok: boolean;
+  sent: number;
+  total: number;
+  reason?: string;
+}
+
+async function sendSpaceInvites(spaceId: string, inviteeEmails: string[]): Promise<Error | null> {
+  if (inviteeEmails.length === 0) return null;
+
+  const { data, error } = await supabase.functions.invoke<InviteFunctionResponse>('send-space-invite', {
+    body: { spaceId, inviteeEmails },
+  });
+
+  if (error) {
+    return new Error('The invitation was saved, but its email could not be sent. Try again in a moment.');
+  }
+
+  if (!data?.ok || data.sent !== inviteeEmails.length) {
+    return new Error(data?.reason || 'Some invitation emails could not be sent.');
+  }
+
+  return null;
+}
 
 export function useTaskSpaces() {
   const { user } = useAuth();
@@ -10,98 +37,145 @@ export function useTaskSpaces() {
   const [error, setError] = useState<string | null>(null);
 
   const fetchSpaces = useCallback(async () => {
-    if (!user) return;
+    if (!user) {
+      setSpaces([]);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
-    const { data: ownedSpaces } = await supabase
-      .from('task_spaces')
-      .select('*')
-      .eq('owner_id', user.id);
-
-    const { data: memberSpaces } = await supabase
-      .from('task_space_members')
-      .select('space_id')
-      .eq('email', user.email || '')
-      .neq('status', 'removed');
-
-    const memberSpaceIds = (memberSpaces || []).map((m) => m.space_id);
-
-    let allSpaces: TaskSpace[] = ownedSpaces || [];
-
-    if (memberSpaceIds.length > 0) {
-      const { data: invitedSpaces } = await supabase
+    const [ownedSpacesResult, membershipsResult] = await Promise.all([
+      supabase
         .from('task_spaces')
         .select('*')
-        .in('id', memberSpaceIds)
-        .neq('owner_id', user.id);
+        .eq('owner_id', user.id),
+      supabase
+        .from('task_space_members')
+        .select('space_id')
+        .eq('user_id', user.id)
+        .eq('status', 'accepted'),
+    ]);
 
-      allSpaces = [...allSpaces, ...(invitedSpaces || [])];
+    if (ownedSpacesResult.error || membershipsResult.error) {
+      setError(ownedSpacesResult.error?.message || membershipsResult.error?.message || 'Failed to load spaces.');
+      setLoading(false);
+      return;
     }
 
-    setSpaces(allSpaces);
+    const ownedSpaces = (ownedSpacesResult.data || []) as TaskSpace[];
+    const ownedIds = new Set(ownedSpaces.map((space) => space.id));
+    const memberSpaceIds = Array.from(new Set(
+      (membershipsResult.data || [])
+        .map((membership) => membership.space_id as string)
+        .filter((spaceId) => !ownedIds.has(spaceId)),
+    ));
+
+    let memberSpaces: TaskSpace[] = [];
+    if (memberSpaceIds.length > 0) {
+      const memberSpacesResult = await supabase
+        .from('task_spaces')
+        .select('*')
+        .in('id', memberSpaceIds);
+
+      if (memberSpacesResult.error) {
+        setError(memberSpacesResult.error.message);
+        setLoading(false);
+        return;
+      }
+      memberSpaces = (memberSpacesResult.data || []) as TaskSpace[];
+    }
+
+    setSpaces([...ownedSpaces, ...memberSpaces].sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+    ));
     setLoading(false);
   }, [user]);
 
   useEffect(() => {
-    fetchSpaces();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void fetchSpaces();
   }, [fetchSpaces]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel(`task-spaces:${user.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'task_spaces' }, () => {
+        void fetchSpaces();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'task_space_members' }, () => {
+        void fetchSpaces();
+      })
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [fetchSpaces, user]);
 
   async function createSpace(
     name: string,
     description?: string,
-    inviteEmails?: { email: string; role: 'editor' | 'viewer' }[]
+    inviteEmails: { email: string; role: CollaboratorRole }[] = [],
   ) {
-    if (!user) return { error: new Error('Not authenticated') };
+    if (!user) return { error: new Error('Not authenticated'), data: null };
+    if (inviteEmails.length > 10) {
+      return { error: new Error('Invite up to 10 people at a time.'), data: null };
+    }
 
-    const { data, error } = await supabase
+    const { data, error: createError } = await supabase
       .from('task_spaces')
       .insert({ owner_id: user.id, name, description: description || null })
       .select()
       .single();
 
-    if (!error && data) {
-      setSpaces((prev) => [data, ...prev]);
+    if (createError || !data) {
+      return { error: createError as Error, data: null };
+    }
 
-      // Bulk-insert invitees
-      if (inviteEmails && inviteEmails.length > 0) {
-        const rows = inviteEmails
-          .filter((i) => i.email.trim() && i.email !== user.email)
-          .map((i) => ({
-            space_id: data.id,
-            email: i.email.trim().toLowerCase(),
-            role: i.role,
-            status: 'invited',
-          }));
+    const ownerEmail = user.email?.toLowerCase();
+    const uniqueInvitees = Array.from(
+      new Map(
+        inviteEmails
+          .map((invitee) => ({ ...invitee, email: invitee.email.trim().toLowerCase() }))
+          .filter((invitee) => invitee.email && invitee.email !== ownerEmail)
+          .map((invitee) => [invitee.email, invitee]),
+      ).values(),
+    );
 
-        if (rows.length > 0) {
-          await supabase.from('task_space_members').insert(rows as never);
-        }
+    if (uniqueInvitees.length > 0) {
+      const { error: memberError } = await supabase.from('task_space_members').insert(
+        uniqueInvitees.map((invitee) => ({
+          space_id: data.id,
+          user_id: null,
+          email: invitee.email,
+          role: invitee.role,
+          status: 'invited',
+        })),
+      );
 
-        // Trigger email notifications via Supabase edge function (non-blocking)
-        try {
-          await supabase.functions.invoke('send-space-invite', {
-            body: {
-              spaceId: data.id,
-              spaceName: name,
-              inviterName: user.user_metadata?.full_name || user.email,
-              inviterEmail: user.email,
-              invitees: rows.map((r) => ({ email: r.email, role: r.role })),
-              inviteUrl: `${window.location.origin}/invite/${data.id}`,
-            },
-          });
-        } catch {
-          // Edge function not deployed — invites still exist in DB
-        }
+      if (memberError) {
+        await supabase.from('task_spaces').delete().eq('id', data.id);
+        return { error: memberError as Error, data: null };
       }
     }
-    return { error: error as Error | null, data };
+
+    setSpaces((previous) => [data as TaskSpace, ...previous]);
+    const warning = await sendSpaceInvites(
+      data.id,
+      uniqueInvitees.map((invitee) => invitee.email),
+    );
+
+    return { error: null, data: data as TaskSpace, warning };
   }
 
   async function deleteSpace(id: string) {
     const { error } = await supabase.from('task_spaces').delete().eq('id', id);
     if (!error) {
-      setSpaces((prev) => prev.filter((s) => s.id !== id));
+      setSpaces((previous) => previous.filter((space) => space.id !== id));
     }
     return { error: error as Error | null };
   }
@@ -115,82 +189,113 @@ export function useSpaceDetails(spaceId: string) {
   const [tasks, setTasks] = useState<SharedTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [userRole, setUserRole] = useState<'owner' | 'editor' | 'viewer'>('viewer');
+  const [userRole, setUserRole] = useState<'owner' | CollaboratorRole>('viewer');
 
   const fetchDetails = useCallback(async () => {
-    if (!user || !spaceId) return;
+    if (!user || !spaceId) {
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
-    const [membersRes, tasksRes, spaceRes] = await Promise.all([
+    const [membersResult, tasksResult, spaceResult] = await Promise.all([
       supabase.from('task_space_members').select('*').eq('space_id', spaceId),
       supabase.from('shared_tasks').select('*').eq('space_id', spaceId).order('created_at', { ascending: false }),
       supabase.from('task_spaces').select('owner_id').eq('id', spaceId).single(),
     ]);
 
-    setMembers(membersRes.data || []);
-    setTasks(tasksRes.data || []);
+    if (membersResult.error || tasksResult.error || spaceResult.error) {
+      setError(
+        membersResult.error?.message
+        || tasksResult.error?.message
+        || spaceResult.error?.message
+        || 'Failed to load the shared space.',
+      );
+      setLoading(false);
+      return;
+    }
 
-    if (spaceRes.data?.owner_id === user.id) {
+    const nextMembers = (membersResult.data || []) as TaskSpaceMember[];
+    setMembers(nextMembers);
+    setTasks((tasksResult.data || []) as SharedTask[]);
+
+    if (spaceResult.data?.owner_id === user.id) {
       setUserRole('owner');
     } else {
-      const myMembership = membersRes.data?.find((m) => m.email === user.email);
-      setUserRole((myMembership?.role as 'editor' | 'viewer') || 'viewer');
+      const membership = nextMembers.find(
+        (member) => member.user_id === user.id && member.status === 'accepted',
+      );
+      setUserRole(membership?.role || 'viewer');
     }
 
-    if (membersRes.error || tasksRes.error) {
-      setError(membersRes.error?.message || tasksRes.error?.message || 'Failed to load');
-    }
     setLoading(false);
-  }, [user, spaceId]);
+  }, [spaceId, user]);
 
   useEffect(() => {
-    fetchDetails();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void fetchDetails();
   }, [fetchDetails]);
 
-  async function inviteMember(
-    email: string,
-    role: 'editor' | 'viewer' = 'editor',
-    spaceName?: string,
-  ) {
-    const normalised = email.trim().toLowerCase();
+  useEffect(() => {
+    if (!user || !spaceId) return;
 
-    // Check not already a member
-    const already = members.find((m) => m.email === normalised && m.status !== 'removed');
-    if (already) return { error: new Error('This person is already invited.') };
+    const channel = supabase
+      .channel(`space-details:${spaceId}:${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'task_space_members', filter: `space_id=eq.${spaceId}` },
+        () => { void fetchDetails(); },
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'shared_tasks', filter: `space_id=eq.${spaceId}` },
+        () => { void fetchDetails(); },
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [fetchDetails, spaceId, user]);
+
+  async function inviteMember(email: string, role: CollaboratorRole = 'editor') {
+    const normalizedEmail = email.trim().toLowerCase();
+    const existing = members.find(
+      (member) => member.email.toLowerCase() === normalizedEmail && member.status !== 'removed',
+    );
+
+    if (existing?.status === 'accepted') {
+      return { error: new Error('This person is already a member.') };
+    }
+
+    if (existing?.status === 'invited') {
+      return { error: await sendSpaceInvites(spaceId, [normalizedEmail]) };
+    }
 
     const { data, error } = await supabase
       .from('task_space_members')
-      .insert({ space_id: spaceId, email: normalised, role, status: 'invited' })
+      .insert({
+        space_id: spaceId,
+        user_id: null,
+        email: normalizedEmail,
+        role,
+        status: 'invited',
+      })
       .select()
       .single();
 
-    if (!error && data) {
-      setMembers((prev) => [...prev, data]);
+    if (error || !data) return { error: error as Error };
 
-      // Send email (non-blocking)
-      try {
-        await supabase.functions.invoke('send-space-invite', {
-          body: {
-            spaceId,
-            spaceName: spaceName || 'a shared space',
-            inviterName: user?.user_metadata?.full_name || user?.email,
-            inviterEmail: user?.email,
-            invitees: [{ email: normalised, role }],
-            inviteUrl: `${window.location.origin}/invite/${spaceId}`,
-          },
-        });
-      } catch {
-        // Edge function not deployed — invite still created in DB
-      }
-    }
-    return { error: error as Error | null };
+    setMembers((previous) => [...previous, data as TaskSpaceMember]);
+    return { error: await sendSpaceInvites(spaceId, [normalizedEmail]) };
   }
 
   async function removeMember(memberId: string) {
     const { error } = await supabase.from('task_space_members').delete().eq('id', memberId);
     if (!error) {
-      setMembers((prev) => prev.filter((m) => m.id !== memberId));
+      setMembers((previous) => previous.filter((member) => member.id !== memberId));
     }
     return { error: error as Error | null };
   }
@@ -218,7 +323,7 @@ export function useSpaceDetails(spaceId: string) {
       .single();
 
     if (!error && data) {
-      setTasks((prev) => [data, ...prev]);
+      setTasks((previous) => [data as SharedTask, ...previous]);
     }
     return { error: error as Error | null, data };
   }
@@ -232,7 +337,7 @@ export function useSpaceDetails(spaceId: string) {
       .single();
 
     if (!error && data) {
-      setTasks((prev) => prev.map((t) => (t.id === id ? data : t)));
+      setTasks((previous) => previous.map((task) => (task.id === id ? data as SharedTask : task)));
     }
     return { error: error as Error | null };
   }
@@ -240,14 +345,22 @@ export function useSpaceDetails(spaceId: string) {
   async function deleteSharedTask(id: string) {
     const { error } = await supabase.from('shared_tasks').delete().eq('id', id);
     if (!error) {
-      setTasks((prev) => prev.filter((t) => t.id !== id));
+      setTasks((previous) => previous.filter((task) => task.id !== id));
     }
     return { error: error as Error | null };
   }
 
   return {
-    members, tasks, loading, error, userRole,
-    fetchDetails, inviteMember, removeMember,
-    createSharedTask, updateSharedTask, deleteSharedTask,
+    members,
+    tasks,
+    loading,
+    error,
+    userRole,
+    fetchDetails,
+    inviteMember,
+    removeMember,
+    createSharedTask,
+    updateSharedTask,
+    deleteSharedTask,
   };
 }

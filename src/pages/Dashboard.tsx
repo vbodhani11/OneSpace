@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { DndContext, type DragEndEvent, type DragStartEvent, useSensor, useSensors, PointerSensor } from '@dnd-kit/core';
+import { DndContext, type DragEndEvent, useSensor, useSensors, PointerSensor } from '@dnd-kit/core';
 import { Plus, Sparkles, Rocket } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/useAuth';
 import { useTasks } from '../hooks/useTasks';
 import { FloatingTask } from '../components/dashboard/FloatingTask';
 import { TaskBin } from '../components/dashboard/TaskBin';
@@ -21,7 +21,7 @@ export function Dashboard() {
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
   );
 
-  function handleDragStart(_event: DragStartEvent): void {
+  function handleDragStart(): void {
     setIsDragging(true);
   }
 

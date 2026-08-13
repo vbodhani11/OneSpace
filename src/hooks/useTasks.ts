@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabaseClient';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/useAuth';
 import type { Task } from '../types/database';
 
 export function useTasks(statusFilter?: string) {
@@ -48,7 +48,8 @@ export function useTasks(statusFilter?: string) {
   }, [user, statusFilter]);
 
   useEffect(() => {
-    fetchTasks();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void fetchTasks();
   }, [fetchTasks]);
 
   async function createTask(taskData: {

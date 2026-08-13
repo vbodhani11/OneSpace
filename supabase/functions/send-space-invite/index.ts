@@ -1,128 +1,219 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { createClient } from 'npm:@supabase/supabase-js@2.104.0';
+import { buildEmailHtml } from './email.ts';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+const RESEND_ENDPOINT = 'https://api.resend.com/emails';
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const MAX_INVITEES = 10;
+const RESEND_COOLDOWN_MS = 10 * 60 * 1000;
 
-interface Invitee {
+interface InviteRequest {
+  spaceId?: unknown;
+  inviteeEmails?: unknown;
+}
+
+interface InvitationRecord {
+  id: string;
   email: string;
-  role: string;
+  role: 'editor' | 'viewer';
+  invite_token: string | null;
+  expires_at: string | null;
+  last_invited_at: string | null;
+  invite_send_count: number;
 }
 
-interface InvitePayload {
-  spaceId: string;
-  spaceName: string;
-  inviterName: string;
-  inviterEmail: string;
-  invitees: Invitee[];
-  inviteUrl: string;
+function appUrl(): URL {
+  const configuredUrl = Deno.env.get('APP_URL') || 'https://onespaceapp.netlify.app';
+  return new URL(configuredUrl);
 }
 
-serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+function corsHeaders(request: Request): Record<string, string> {
+  const configuredOrigin = appUrl().origin;
+  const requestOrigin = request.headers.get('Origin');
+  const isLocalDevelopment = requestOrigin
+    ? /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(requestOrigin)
+    : false;
+  const allowedOrigin = requestOrigin === configuredOrigin || isLocalDevelopment
+    ? requestOrigin
+    : configuredOrigin;
+
+  return {
+    'Access-Control-Allow-Origin': allowedOrigin || configuredOrigin,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Vary': 'Origin',
+  };
+}
+
+function jsonResponse(request: Request, body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders(request), 'Content-Type': 'application/json' },
+  });
+}
+
+Deno.serve(async (request: Request) => {
+  if (request.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders(request) });
+  }
+
+  if (request.method !== 'POST') {
+    return jsonResponse(request, { ok: false, reason: 'Method not allowed.' }, 405);
   }
 
   try {
-    const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
-    if (!RESEND_API_KEY) {
-      // Gracefully fail — invites are still stored in DB
-      return new Response(
-        JSON.stringify({ ok: false, reason: 'RESEND_API_KEY not configured' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
-      );
+    const authorization = request.headers.get('Authorization');
+    if (!authorization?.startsWith('Bearer ')) {
+      return jsonResponse(request, { ok: false, reason: 'Authentication required.' }, 401);
     }
 
-    const payload: InvitePayload = await req.json();
-    const { spaceName, inviterName, invitees, inviteUrl } = payload;
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
+    if (!supabaseUrl || !supabaseAnonKey) {
+      return jsonResponse(request, { ok: false, reason: 'Service configuration is incomplete.' }, 503);
+    }
 
-    const results = await Promise.allSettled(
-      invitees.map(({ email, role }) =>
-        fetch('https://api.resend.com/emails', {
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authorization } },
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+    const user = authData.user;
+    if (authError || !user) {
+      return jsonResponse(request, { ok: false, reason: 'Authentication required.' }, 401);
+    }
+
+    const payload = await request.json() as InviteRequest;
+    const spaceId = typeof payload.spaceId === 'string' ? payload.spaceId : '';
+    const rawEmails = Array.isArray(payload.inviteeEmails) ? payload.inviteeEmails : [];
+    const inviteeEmails = Array.from(new Set(
+      rawEmails
+        .filter((email): email is string => typeof email === 'string')
+        .map((email) => email.trim().toLowerCase()),
+    ));
+
+    if (!UUID_PATTERN.test(spaceId)) {
+      return jsonResponse(request, { ok: false, reason: 'A valid space is required.' }, 400);
+    }
+    if (inviteeEmails.length < 1 || inviteeEmails.length > MAX_INVITEES) {
+      return jsonResponse(request, { ok: false, reason: `Send between 1 and ${MAX_INVITEES} invitations at a time.` }, 400);
+    }
+    if (inviteeEmails.some((email) => !EMAIL_PATTERN.test(email))) {
+      return jsonResponse(request, { ok: false, reason: 'Every invitee must have a valid email address.' }, 400);
+    }
+
+    const { data: space, error: spaceError } = await supabase
+      .from('task_spaces')
+      .select('id, name, owner_id')
+      .eq('id', spaceId)
+      .single();
+
+    if (spaceError || !space || space.owner_id !== user.id) {
+      return jsonResponse(request, { ok: false, reason: 'Only the space owner can send invitations.' }, 403);
+    }
+
+    const { data: invitationRows, error: invitationError } = await supabase
+      .from('task_space_members')
+      .select('id, email, role, invite_token, expires_at, last_invited_at, invite_send_count')
+      .eq('space_id', spaceId)
+      .eq('status', 'invited')
+      .in('email', inviteeEmails);
+
+    if (invitationError) {
+      return jsonResponse(request, { ok: false, reason: 'Invitations could not be verified.' }, 500);
+    }
+
+    const now = Date.now();
+    const invitations = (invitationRows || []) as InvitationRecord[];
+    const eligibleInvitations = invitations.filter((invitation) => {
+      const expiresAt = invitation.expires_at ? new Date(invitation.expires_at).getTime() : 0;
+      const lastSentAt = invitation.last_invited_at ? new Date(invitation.last_invited_at).getTime() : 0;
+      return Boolean(invitation.invite_token)
+        && expiresAt > now
+        && invitation.invite_send_count < 5
+        && (!lastSentAt || now - lastSentAt >= RESEND_COOLDOWN_MS);
+    });
+
+    if (eligibleInvitations.length === 0) {
+      return jsonResponse(request, {
+        ok: false,
+        sent: 0,
+        total: inviteeEmails.length,
+        reason: 'No sendable invitations were found. The invite may be expired or was emailed recently.',
+      });
+    }
+
+    const resendApiKey = Deno.env.get('RESEND_API_KEY');
+    if (!resendApiKey) {
+      return jsonResponse(request, {
+        ok: false,
+        sent: 0,
+        total: inviteeEmails.length,
+        reason: 'Email delivery is not configured.',
+      });
+    }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', user.id)
+      .maybeSingle();
+    const inviterName = profile?.full_name || user.email || 'A OneSpace user';
+
+    const deliveryResults = await Promise.all(eligibleInvitations.map(async (invitation) => {
+      const invitationUrl = new URL(`/invite/${invitation.invite_token}`, appUrl()).toString();
+      try {
+        const response = await fetch(RESEND_ENDPOINT, {
           method: 'POST',
           headers: {
-            Authorization: `Bearer ${RESEND_API_KEY}`,
+            Authorization: `Bearer ${resendApiKey}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            from: 'OneSpace <noreply@onespace-abc123.netlify.app>',
-            to: [email],
-            subject: `${inviterName} invited you to "${spaceName}" on OneSpace`,
-            html: buildEmailHtml({ spaceName, inviterName, role, inviteUrl }),
+            from: Deno.env.get('RESEND_FROM_EMAIL') || 'OneSpace <onboarding@resend.dev>',
+            to: [invitation.email],
+            subject: `${inviterName} invited you to "${space.name}" on OneSpace`,
+            html: buildEmailHtml({
+              spaceName: space.name,
+              inviterName,
+              role: invitation.role,
+              invitationUrl,
+            }),
           }),
+        });
+
+        if (!response.ok) {
+          await response.text();
+          return { invitation, delivered: false };
+        }
+
+        return { invitation, delivered: true };
+      } catch {
+        return { invitation, delivered: false };
+      }
+    }));
+
+    const delivered = deliveryResults.filter((result) => result.delivered);
+    await Promise.all(delivered.map(({ invitation }) => (
+      supabase
+        .from('task_space_members')
+        .update({
+          last_invited_at: new Date().toISOString(),
+          invite_send_count: invitation.invite_send_count + 1,
         })
-      )
-    );
+        .eq('id', invitation.id)
+        .eq('space_id', spaceId)
+    )));
 
-    const sent = results.filter((r) => r.status === 'fulfilled').length;
-
-    return new Response(
-      JSON.stringify({ ok: true, sent, total: invitees.length }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
-    );
-  } catch (err: unknown) {
-    return new Response(
-      JSON.stringify({ ok: false, error: String(err) }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
-    );
+    const sent = delivered.length;
+    return jsonResponse(request, {
+      ok: sent === inviteeEmails.length,
+      sent,
+      total: inviteeEmails.length,
+      reason: sent === inviteeEmails.length ? undefined : 'Some invitation emails could not be sent.',
+    });
+  } catch {
+    return jsonResponse(request, { ok: false, reason: 'The invitation could not be processed.' }, 500);
   }
 });
-
-function buildEmailHtml({
-  spaceName,
-  inviterName,
-  role,
-  inviteUrl,
-}: {
-  spaceName: string;
-  inviterName: string;
-  role: string;
-  inviteUrl: string;
-}) {
-  return `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>You're invited to ${spaceName}</title>
-</head>
-<body style="margin:0;padding:0;background:#0a0a18;font-family:Inter,sans-serif;color:#e2e8f0;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 20px;">
-    <tr><td align="center">
-      <table width="560" cellpadding="0" cellspacing="0" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:20px;padding:40px 36px;max-width:560px;">
-        <tr><td style="text-align:center;padding-bottom:28px;">
-          <div style="font-size:28px;font-weight:900;background:linear-gradient(135deg,#a78bfa,#60a5fa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">
-            OneSpace
-          </div>
-        </td></tr>
-        <tr><td style="text-align:center;padding-bottom:20px;">
-          <h1 style="margin:0;font-size:22px;font-weight:700;color:#f1f5f9;">
-            You've been invited!
-          </h1>
-          <p style="margin:12px 0 0;color:#94a3b8;font-size:15px;line-height:1.6;">
-            <strong style="color:#e2e8f0;">${inviterName}</strong> has invited you to collaborate
-            on <strong style="color:#a78bfa;">${spaceName}</strong> as ${role === 'editor' ? 'an editor' : 'a viewer'}.
-          </p>
-        </td></tr>
-        <tr><td style="text-align:center;padding:24px 0;">
-          <a href="${inviteUrl}" style="display:inline-block;background:linear-gradient(135deg,#7c3aed,#3b82f6);color:#ffffff;text-decoration:none;padding:14px 36px;border-radius:12px;font-weight:600;font-size:15px;letter-spacing:0.3px;">
-            Accept invitation →
-          </a>
-        </td></tr>
-        <tr><td style="text-align:center;padding-top:8px;">
-          <p style="margin:0;color:#475569;font-size:12px;line-height:1.6;">
-            Or copy this link:<br />
-            <a href="${inviteUrl}" style="color:#7c3aed;word-break:break-all;">${inviteUrl}</a>
-          </p>
-          <p style="margin:20px 0 0;color:#334155;font-size:11px;">
-            If you weren't expecting this invite, you can safely ignore this email.
-          </p>
-        </td></tr>
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>`;
-}

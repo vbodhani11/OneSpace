@@ -2,7 +2,7 @@
 import { motion } from 'framer-motion';
 import { Users, ChevronRight, Trash2, Crown } from 'lucide-react';
 import type { TaskSpace } from '../../types/database';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../contexts/useAuth';
 import { formatDate } from '../../lib/utils';
 
 interface SharedSpaceCardProps {

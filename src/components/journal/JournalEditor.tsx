@@ -1,5 +1,4 @@
-import { } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { motion } from 'framer-motion';
@@ -32,7 +31,7 @@ export function JournalEditor({ initialData, onSubmit, onCancel, submitLabel = '
     register,
     handleSubmit,
     setValue,
-    watch,
+    control,
     formState: { errors, isSubmitting },
   } = useForm<JournalFormData>({
     resolver: zodResolver(journalSchema),
@@ -44,7 +43,7 @@ export function JournalEditor({ initialData, onSubmit, onCancel, submitLabel = '
     },
   });
 
-  const content = watch('content');
+  const content = useWatch({ control, name: 'content' });
 
   function handleSpeechResult(text: string) {
     const current = content || '';

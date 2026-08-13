@@ -6,8 +6,8 @@ import {
   Mail, Calendar, Edit2, Check, X, LogOut,
   Moon, Sun, Monitor, Bell, Volume2, Trash2, ChevronRight,
 } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
-import { useTheme } from '../contexts/ThemeContext';
+import { useAuth } from '../contexts/useAuth';
+import { useTheme } from '../contexts/useTheme';
 import { supabase } from '../lib/supabaseClient';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Clock } from 'lucide-react';
 import type { CalendarEvent } from '../../types/database';
-import { getDaysInMonth, getFirstDayOfMonth, formatTime } from '../../lib/utils';
+import { formatTime, getDaysInMonth, getFirstDayOfMonth, toLocalDateKey } from '../../lib/utils';
 
 const DAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 const MONTHS = [
@@ -22,9 +22,10 @@ interface CalendarViewProps {
   events: CalendarEvent[];
   selectedDate: string;
   onSelectDate: (date: string) => void;
+  onSelectEvent: (event: CalendarEvent) => void;
 }
 
-export function CalendarView({ events, selectedDate, onSelectDate }: CalendarViewProps) {
+export function CalendarView({ events, selectedDate, onSelectDate, onSelectEvent }: CalendarViewProps) {
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
@@ -48,30 +49,30 @@ export function CalendarView({ events, selectedDate, onSelectDate }: CalendarVie
 
   function hasEvent(day: number) {
     const dateStr = getDateStr(day);
-    return events.some((e) => e.start_time.startsWith(dateStr));
+    return events.some((e) => toLocalDateKey(e.start_time) === dateStr);
   }
 
   function isToday(day: number) {
-    return getDateStr(day) === today.toISOString().split('T')[0];
+    return getDateStr(day) === toLocalDateKey(today);
   }
 
   function isSelected(day: number) {
     return getDateStr(day) === selectedDate;
   }
 
-  const selectedEvents = events.filter((e) => e.start_time.startsWith(selectedDate));
+  const selectedEvents = events.filter((e) => toLocalDateKey(e.start_time) === selectedDate);
 
   return (
     <div>
       <div className="glass-card p-4 mb-4">
         <div className="flex items-center justify-between mb-4">
-          <button onClick={prevMonth} className="p-2 rounded-xl hover:bg-white/10 text-white/60 hover:text-white transition-all">
+          <button aria-label="Previous month" onClick={prevMonth} className="p-2 rounded-xl hover:bg-white/10 text-white/60 hover:text-white transition-all">
             <ChevronLeft size={18} />
           </button>
           <h2 className="text-base font-semibold text-white">
             {MONTHS[viewMonth]} {viewYear}
           </h2>
-          <button onClick={nextMonth} className="p-2 rounded-xl hover:bg-white/10 text-white/60 hover:text-white transition-all">
+          <button aria-label="Next month" onClick={nextMonth} className="p-2 rounded-xl hover:bg-white/10 text-white/60 hover:text-white transition-all">
             <ChevronRight size={18} />
           </button>
         </div>
@@ -91,6 +92,7 @@ export function CalendarView({ events, selectedDate, onSelectDate }: CalendarVie
               key={day}
               whileTap={{ scale: 0.9 }}
               onClick={() => onSelectDate(getDateStr(day))}
+              aria-label={`Select ${getDateStr(day)}${hasEvent(day) ? ', has events' : ''}`}
               className={`
                 relative flex items-center justify-center h-9 text-sm rounded-xl transition-all duration-200
                 ${isSelected(day)
@@ -120,7 +122,14 @@ export function CalendarView({ events, selectedDate, onSelectDate }: CalendarVie
             Events on {selectedDate}
           </p>
           {selectedEvents.map((event) => (
-            <div key={event.id} className="glass-card p-3 flex items-start gap-3">
+            <motion.button
+              key={event.id}
+              type="button"
+              whileTap={{ scale: 0.98 }}
+              onClick={() => onSelectEvent(event)}
+              aria-label={`Edit ${event.title}`}
+              className="glass-card p-3 flex items-start gap-3 w-full text-left hover:bg-white/8 transition-colors"
+            >
               <div className={`w-1 self-stretch rounded-full ${eventTypeColors[event.event_type] || 'bg-white/20'}`} />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-white/90">{event.title}</p>
@@ -132,7 +141,7 @@ export function CalendarView({ events, selectedDate, onSelectDate }: CalendarVie
                   <span className="ml-1 capitalize text-white/20">· {event.event_type}</span>
                 </div>
               </div>
-            </div>
+            </motion.button>
           ))}
         </motion.div>
       )}

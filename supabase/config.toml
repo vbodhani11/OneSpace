@@ -1,0 +1,17 @@
+# Local/branch-safe configuration. Production Auth settings remain managed in
+# Supabase and are intentionally not duplicated or changed by this pull request.
+project_id = "OneSpace"
+
+[db]
+major_version = 17
+
+[db.migrations]
+enabled = true
+schema_paths = []
+
+[db.seed]
+enabled = false
+sql_paths = []
+
+[functions.send-space-invite]
+verify_jwt = true
