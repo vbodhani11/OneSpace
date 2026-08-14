@@ -11,20 +11,22 @@ import { Input } from '../ui/Input';
 
 const loginSchema = z.object({
   email: z.string().email('Please enter a valid email'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+  password: z.string().min(1, 'Password is required'),
 });
 
 type LoginFormData = z.infer<typeof loginSchema>;
 
 export function LoginForm() {
-  const { signIn, signInWithGoogle, postLoginRedirect } = useAuth();
+  const { signIn, signInWithGoogle, resendConfirmation, postLoginRedirect } = useAuth();
   const navigate = useNavigate();
   const [authError, setAuthError] = useState<string | null>(null);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [resendStatus, setResendStatus] = useState<string | null>(null);
 
   const {
     register,
     handleSubmit,
+    getValues,
     formState: { errors, isSubmitting },
   } = useForm<LoginFormData>({ resolver: zodResolver(loginSchema) });
 
@@ -47,6 +49,22 @@ export function LoginForm() {
     }
   }
 
+  async function handleResendConfirmation() {
+    const email = getValues('email');
+    if (!email) {
+      setResendStatus('Enter your email address first.');
+      return;
+    }
+
+    setResendStatus('Sending…');
+    const { error } = await resendConfirmation(email);
+    setResendStatus(error ? error.message : 'Confirmation email sent. Check your inbox.');
+  }
+
+  const emailNotConfirmed = Boolean(
+    authError?.includes('Email not confirmed') || authError?.includes('email_not_confirmed'),
+  );
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 30 }}
@@ -67,9 +85,19 @@ export function LoginForm() {
             exit={{ opacity: 0 }}
             className="mb-4 p-3 rounded-xl bg-red-500/15 border border-red-500/30 text-red-400 text-sm"
           >
-            {authError.includes('Email not confirmed') || authError.includes('email_not_confirmed')
+            {emailNotConfirmed
               ? 'Your email is not confirmed yet. Please check your inbox and click the confirmation link.'
               : authError}
+            {emailNotConfirmed && (
+              <button
+                type="button"
+                onClick={handleResendConfirmation}
+                className="block mt-2 text-xs font-semibold text-red-200 underline underline-offset-2"
+              >
+                Resend confirmation email
+              </button>
+            )}
+            {resendStatus && <p className="mt-2 text-xs text-red-100" role="status">{resendStatus}</p>}
           </motion.div>
         )}
       </AnimatePresence>
@@ -78,6 +106,7 @@ export function LoginForm() {
         <Input
           label="Email"
           type="email"
+          autoComplete="email"
           placeholder="you@example.com"
           icon={<Mail size={16} />}
           error={errors.email?.message}
@@ -86,6 +115,7 @@ export function LoginForm() {
         <Input
           label="Password"
           type="password"
+          autoComplete="current-password"
           placeholder="••••••••"
           icon={<Lock size={16} />}
           error={errors.password?.message}
@@ -100,6 +130,12 @@ export function LoginForm() {
         >
           Sign in
         </Button>
+
+        <div className="text-right">
+          <Link to="/forgot-password" className="text-xs text-accent-cyan hover:underline">
+            Forgot password?
+          </Link>
+        </div>
       </form>
 
       <div className="relative my-5">

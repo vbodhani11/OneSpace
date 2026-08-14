@@ -8,8 +8,8 @@ import type { CalendarEvent } from '../../types/database';
 import { toDateTimeLocalValue } from '../../lib/utils';
 
 const eventSchema = z.object({
-  title: z.string().min(1, 'Title is required'),
-  description: z.string().optional(),
+  title: z.string().trim().min(1, 'Title is required').max(160, 'Title is too long'),
+  description: z.string().max(2_000, 'Description is too long').optional(),
   start_time: z.string().min(1, 'Start time is required'),
   end_time: z.string().optional(),
   event_type: z.enum(['personal', 'work', 'health', 'social', 'other']),
@@ -32,6 +32,7 @@ interface EventFormProps {
 export function EventForm({ initialData, defaultDate, onSubmit, onCancel, onDelete, submitLabel = 'Create event' }: EventFormProps) {
   const [submitError, setSubmitError] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const defaultStartTime = initialData?.start_time
     ? toDateTimeLocalValue(initialData.start_time)
     : defaultDate
@@ -120,10 +121,15 @@ export function EventForm({ initialData, defaultDate, onSubmit, onCancel, onDele
       )}
 
       <div className="flex gap-3 pt-2">
-        {onDelete && (
-          <Button type="button" variant="danger" onClick={deleteEvent} loading={isDeleting} size="sm">
-            Delete
-          </Button>
+        {onDelete && !confirmingDelete && (
+          <Button type="button" variant="danger" onClick={() => setConfirmingDelete(true)} size="sm">Delete</Button>
+        )}
+        {onDelete && confirmingDelete && (
+          <div className="flex items-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 p-2" role="alert">
+            <span className="text-xs text-red-200">Delete permanently?</span>
+            <Button type="button" variant="ghost" onClick={() => setConfirmingDelete(false)} size="sm">No</Button>
+            <Button type="button" variant="danger" onClick={deleteEvent} loading={isDeleting} size="sm">Yes</Button>
+          </div>
         )}
         <Button type="button" variant="secondary" onClick={onCancel} className="flex-1">
           Cancel

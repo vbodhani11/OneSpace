@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../contexts/useAuth';
 import type { Task } from '../types/database';
 
-export function useTasks(statusFilter?: string) {
+export function useTasks(statusFilter?: Task['status']) {
   const { user } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(false);
@@ -18,10 +18,11 @@ export function useTasks(statusFilter?: string) {
     setLoading(true);
     setError(null);
 
-    // Safety timeout — stop loading after 8s so the UI never hangs forever
-    const timeoutId = setTimeout(() => {
-      setLoading(false);
-      setError('Taking too long to load. Tap retry.');
+    const controller = new AbortController();
+    let timedOut = false;
+    const timeoutId = window.setTimeout(() => {
+      timedOut = true;
+      controller.abort();
     }, 8000);
 
     try {
@@ -29,20 +30,23 @@ export function useTasks(statusFilter?: string) {
         .from('tasks')
         .select('*')
         .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .abortSignal(controller.signal);
 
       if (statusFilter) {
         query = query.eq('status', statusFilter);
       }
 
       const { data, error } = await query;
-      if (error) {
+      if (timedOut) {
+        setError('Taking too long to load. Tap retry.');
+      } else if (error) {
         setError(error.message);
       } else {
         setTasks(data || []);
       }
     } finally {
-      clearTimeout(timeoutId);
+      window.clearTimeout(timeoutId);
       setLoading(false);
     }
   }, [user, statusFilter]);
@@ -127,7 +131,7 @@ export function useTasks(statusFilter?: string) {
   }
 
   async function clearCompleted() {
-    if (!user) return;
+    if (!user) return { error: new Error('Not authenticated') };
     const { error } = await supabase
       .from('tasks')
       .delete()
@@ -136,6 +140,7 @@ export function useTasks(statusFilter?: string) {
     if (!error) {
       setTasks((prev) => prev.filter((t) => t.status !== 'completed'));
     }
+    return { error: error as Error | null };
   }
 
   return { tasks, loading, error, fetchTasks, createTask, updateTask, toggleTask, deleteTask, clearCompleted };

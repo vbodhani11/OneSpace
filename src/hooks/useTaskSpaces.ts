@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/useAuth';
 import type { SharedTask, TaskSpace, TaskSpaceMember } from '../types/database';
 
 type CollaboratorRole = 'editor' | 'viewer';
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 interface InviteFunctionResponse {
   ok: boolean;
@@ -122,13 +123,25 @@ export function useTaskSpaces() {
     inviteEmails: { email: string; role: CollaboratorRole }[] = [],
   ) {
     if (!user) return { error: new Error('Not authenticated'), data: null };
+    const normalizedName = name.trim();
+    const normalizedDescription = description?.trim() || '';
+    if (!normalizedName || normalizedName.length > 100) {
+      return { error: new Error('Space name must be between 1 and 100 characters.'), data: null };
+    }
+    if (normalizedDescription.length > 2_000) {
+      return { error: new Error('Description must be 2,000 characters or fewer.'), data: null };
+    }
     if (inviteEmails.length > 10) {
       return { error: new Error('Invite up to 10 people at a time.'), data: null };
     }
 
     const { data, error: createError } = await supabase
       .from('task_spaces')
-      .insert({ owner_id: user.id, name, description: description || null })
+      .insert({
+        owner_id: user.id,
+        name: normalizedName,
+        description: normalizedDescription || null,
+      })
       .select()
       .single();
 
@@ -262,6 +275,13 @@ export function useSpaceDetails(spaceId: string) {
 
   async function inviteMember(email: string, role: CollaboratorRole = 'editor') {
     const normalizedEmail = email.trim().toLowerCase();
+    if (!EMAIL_PATTERN.test(normalizedEmail) || normalizedEmail.length > 254) {
+      return { error: new Error('Enter a valid email address.') };
+    }
+    if (normalizedEmail === user?.email?.trim().toLowerCase()) {
+      return { error: new Error('You already own this space, so you cannot invite yourself.') };
+    }
+
     const existing = members.find(
       (member) => member.email.toLowerCase() === normalizedEmail && member.status !== 'removed',
     );
@@ -271,6 +291,22 @@ export function useSpaceDetails(spaceId: string) {
     }
 
     if (existing?.status === 'invited') {
+      if (existing.role !== role) {
+        const { error: roleError } = await supabase
+          .from('task_space_members')
+          .update({ role })
+          .eq('id', existing.id);
+        if (roleError) return { error: roleError as Error };
+      }
+
+      const expired = !existing.expires_at || new Date(existing.expires_at).getTime() <= Date.now();
+      if (!existing.invite_token || expired || existing.invite_send_count >= 5) {
+        const { error: renewalError } = await supabase.rpc('renew_space_invite', {
+          p_member_id: existing.id,
+        });
+        if (renewalError) return { error: renewalError as Error };
+      }
+
       return { error: await sendSpaceInvites(spaceId, [normalizedEmail]) };
     }
 

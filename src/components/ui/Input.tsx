@@ -1,14 +1,17 @@
-import type React from 'react';
+import { useId, type InputHTMLAttributes, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
 import { cn } from '../../lib/utils';
 
-interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   error?: string;
   icon?: React.ReactNode;
 }
 
 export function Input({ label, error, icon, className, id, ...props }: InputProps) {
-  const inputId = id || label?.toLowerCase().replace(/\s+/g, '-');
+  const generatedId = useId();
+  const inputId = id || `input-${generatedId}`;
+  const errorId = `${inputId}-error`;
+  const describedBy = [props['aria-describedby'], error ? errorId : null].filter(Boolean).join(' ') || undefined;
 
   return (
     <div className="w-full">
@@ -19,33 +22,38 @@ export function Input({ label, error, icon, className, id, ...props }: InputProp
       )}
       <div className="relative">
         {icon && (
-          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40">
+          <div aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40">
             {icon}
           </div>
         )}
         <input
+          {...props}
           id={inputId}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={describedBy}
           className={cn(
             'input-field',
             icon && 'pl-10',
             error && 'border-red-500/60 focus:border-red-500/80',
             className
           )}
-          {...props}
         />
       </div>
-      {error && <p className="mt-1 text-xs text-red-400">{error}</p>}
+      {error && <p id={errorId} role="alert" className="mt-1 text-xs text-red-400">{error}</p>}
     </div>
   );
 }
 
-interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
+interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
   label?: string;
   error?: string;
 }
 
 export function Textarea({ label, error, className, id, ...props }: TextareaProps) {
-  const inputId = id || label?.toLowerCase().replace(/\s+/g, '-');
+  const generatedId = useId();
+  const inputId = id || `textarea-${generatedId}`;
+  const errorId = `${inputId}-error`;
+  const describedBy = [props['aria-describedby'], error ? errorId : null].filter(Boolean).join(' ') || undefined;
 
   return (
     <div className="w-full">
@@ -55,27 +63,32 @@ export function Textarea({ label, error, className, id, ...props }: TextareaProp
         </label>
       )}
       <textarea
+        {...props}
         id={inputId}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={describedBy}
         className={cn(
           'input-field resize-none',
           error && 'border-red-500/60 focus:border-red-500/80',
           className
         )}
-        {...props}
       />
-      {error && <p className="mt-1 text-xs text-red-400">{error}</p>}
+      {error && <p id={errorId} role="alert" className="mt-1 text-xs text-red-400">{error}</p>}
     </div>
   );
 }
 
-interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
+interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
   label?: string;
   error?: string;
   options: { value: string; label: string }[];
 }
 
 export function Select({ label, error, options, className, id, ...props }: SelectProps) {
-  const inputId = id || label?.toLowerCase().replace(/\s+/g, '-');
+  const generatedId = useId();
+  const inputId = id || `select-${generatedId}`;
+  const errorId = `${inputId}-error`;
+  const describedBy = [props['aria-describedby'], error ? errorId : null].filter(Boolean).join(' ') || undefined;
 
   return (
     <div className="w-full">
@@ -85,13 +98,15 @@ export function Select({ label, error, options, className, id, ...props }: Selec
         </label>
       )}
       <select
+        {...props}
         id={inputId}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={describedBy}
         className={cn(
           'input-field appearance-none cursor-pointer',
           error && 'border-red-500/60',
           className
         )}
-        {...props}
       >
         {options.map((opt) => (
           <option key={opt.value} value={opt.value} className="bg-space-800 text-white">
@@ -99,7 +114,7 @@ export function Select({ label, error, options, className, id, ...props }: Selec
           </option>
         ))}
       </select>
-      {error && <p className="mt-1 text-xs text-red-400">{error}</p>}
+      {error && <p id={errorId} role="alert" className="mt-1 text-xs text-red-400">{error}</p>}
     </div>
   );
 }

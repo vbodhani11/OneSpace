@@ -55,9 +55,9 @@ src/
 | `VITE_SUPABASE_URL` | Supabase project URL |
 | `VITE_SUPABASE_ANON_KEY` | Supabase anonymous/public API key |
 
-The `send-space-invite` Edge Function also requires `RESEND_API_KEY`. Set `APP_URL`
-and `RESEND_FROM_EMAIL` for the deployed environment instead of relying on local
-defaults.
+The `send-space-invite` Edge Function requires `RESEND_API_KEY`, `RESEND_FROM_EMAIL`,
+and `APP_URL`. It refuses to send when the email sender is not configured, so a
+development-only Resend address cannot accidentally reach production.
 
 ---
 
@@ -73,10 +73,16 @@ production build. GitHub Actions runs the same command for every pull request.
 
 ## Database changes
 
-Supabase schema changes are versioned under `supabase/migrations`. Apply the
-collaboration-security migration before deploying frontend code that uses tokenized
-invitations. Review and test it in a local or preview database first; do not apply it
-directly to production without a backup and rollout plan.
+Supabase schema changes are versioned under `supabase/migrations`. The production
+migration version and the repository filename now match. The original pre-migration
+schema is preserved at `supabase/baseline/20260813_initial_schema.sql` so a new
+environment can be reproduced: apply that baseline only to an empty Supabase project,
+then apply the numbered migrations in order.
+
+Never run the baseline against an existing environment. Review new migrations in a
+local or preview database first; do not apply them directly to production without a
+backup and rollout plan. The invitation-delivery migration must be deployed before
+the updated Edge Function and frontend resend flow.
 
 ---
 

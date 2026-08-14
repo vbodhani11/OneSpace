@@ -6,6 +6,7 @@ import { formatDate, truncate } from '../../lib/utils';
 import { PriorityBadge } from '../ui/Card';
 import { Modal } from '../ui/Modal';
 import { TaskForm } from './TaskForm';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
 
 interface TaskCardProps {
   task: Pick<Task, 'id' | 'title' | 'description' | 'status' | 'priority' | 'due_date'>;
@@ -17,6 +18,8 @@ interface TaskCardProps {
 
 export function TaskCard({ task, onToggleComplete, onDelete, onUpdate, showActions = true }: TaskCardProps) {
   const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [actionError, setActionError] = useState('');
 
   async function handleEdit(data: Partial<Task>) {
@@ -30,8 +33,10 @@ export function TaskCard({ task, onToggleComplete, onDelete, onUpdate, showActio
     setActionError('');
     try {
       await action();
+      return true;
     } catch (error) {
       setActionError(error instanceof Error ? error.message : fallbackMessage);
+      return false;
     }
   }
 
@@ -98,10 +103,7 @@ export function TaskCard({ task, onToggleComplete, onDelete, onUpdate, showActio
               {onDelete && (
                 <button
                   type="button"
-                  onClick={() => void runAction(
-                    () => onDelete(task.id),
-                    'The task could not be deleted.',
-                  )}
+                  onClick={() => setDeleteOpen(true)}
                   aria-label={`Delete ${task.title}`}
                   className="p-1.5 text-white/30 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
                 >
@@ -125,6 +127,20 @@ export function TaskCard({ task, onToggleComplete, onDelete, onUpdate, showActio
           submitLabel="Update task"
         />
       </Modal>
+      <ConfirmDialog
+        isOpen={deleteOpen}
+        title="Delete task?"
+        message={`“${task.title}” will be permanently removed.`}
+        loading={deleting}
+        onClose={() => setDeleteOpen(false)}
+        onConfirm={() => {
+          if (!onDelete) return;
+          setDeleting(true);
+          void runAction(() => onDelete(task.id), 'The task could not be deleted.')
+            .then((succeeded) => { if (succeeded) setDeleteOpen(false); })
+            .finally(() => setDeleting(false));
+        }}
+      />
     </>
   );
 }
