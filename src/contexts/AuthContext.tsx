@@ -18,17 +18,17 @@ async function ensureProfile(user: User) {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Safety timeout — never leave the app stuck on loading
-    const timeout = setTimeout(() => setLoading(false), 5000);
+    let active = true;
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    void supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!active) return;
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
-      clearTimeout(timeout);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -36,7 +36,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
-        clearTimeout(timeout);
+
+        if (_event === 'PASSWORD_RECOVERY') setIsPasswordRecovery(true);
+        if (_event === 'SIGNED_OUT') setIsPasswordRecovery(false);
 
         if (_event === 'SIGNED_IN' && session?.user) {
           void ensureProfile(session.user);
@@ -45,7 +47,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     );
 
     return () => {
-      clearTimeout(timeout);
+      active = false;
       subscription.unsubscribe();
     };
   }, []);
@@ -100,14 +102,52 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error: error as Error | null };
   }
 
+  async function requestPasswordReset(email: string) {
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    return { error: error as Error | null };
+  }
+
+  async function updatePassword(password: string) {
+    const { error } = await supabase.auth.updateUser({ password });
+    if (!error) setIsPasswordRecovery(false);
+    return { error: error as Error | null };
+  }
+
+  async function resendConfirmation(email: string) {
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: email.trim().toLowerCase(),
+      options: { emailRedirectTo: `${window.location.origin}/dashboard` },
+    });
+    return { error: error as Error | null };
+  }
+
   async function signOut() {
-    setUser(null);
-    setSession(null);
-    await supabase.auth.signOut();
+    const { error } = await supabase.auth.signOut();
+    if (!error) {
+      setUser(null);
+      setSession(null);
+    }
+    return { error: error as Error | null };
   }
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signInWithGoogle, signOut, postLoginRedirect }}>
+    <AuthContext.Provider value={{
+      user,
+      session,
+      isPasswordRecovery,
+      loading,
+      signIn,
+      signUp,
+      signInWithGoogle,
+      requestPasswordReset,
+      updatePassword,
+      resendConfirmation,
+      signOut,
+      postLoginRedirect,
+    }}>
       {children}
     </AuthContext.Provider>
   );

@@ -8,11 +8,12 @@ import { z } from 'zod';
 import { useAuth } from '../../contexts/useAuth';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
+import { passwordSchema } from '../../lib/validation';
 
 const signupSchema = z.object({
-  fullName: z.string().min(2, 'Name must be at least 2 characters'),
+  fullName: z.string().trim().min(2, 'Name must be at least 2 characters').max(80, 'Name is too long'),
   email: z.string().email('Please enter a valid email'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+  password: passwordSchema,
   confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
@@ -113,6 +114,7 @@ export function SignupForm() {
         <Input
           label="Full Name"
           type="text"
+          autoComplete="name"
           placeholder="Your name"
           icon={<User size={16} />}
           error={errors.fullName?.message}
@@ -121,6 +123,7 @@ export function SignupForm() {
         <Input
           label="Email"
           type="email"
+          autoComplete="email"
           placeholder="you@example.com"
           icon={<Mail size={16} />}
           error={errors.email?.message}
@@ -129,6 +132,7 @@ export function SignupForm() {
         <Input
           label="Password"
           type="password"
+          autoComplete="new-password"
           placeholder="••••••••"
           icon={<Lock size={16} />}
           error={errors.password?.message}
@@ -137,6 +141,7 @@ export function SignupForm() {
         <Input
           label="Confirm Password"
           type="password"
+          autoComplete="new-password"
           placeholder="••••••••"
           icon={<Lock size={16} />}
           error={errors.confirmPassword?.message}

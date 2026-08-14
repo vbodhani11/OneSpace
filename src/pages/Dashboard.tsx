@@ -1,6 +1,13 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { DndContext, type DragEndEvent, useSensor, useSensors, PointerSensor } from '@dnd-kit/core';
+import {
+  DndContext,
+  type DragEndEvent,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
 import { Plus, Sparkles, Rocket } from 'lucide-react';
 import { useAuth } from '../contexts/useAuth';
 import { useTasks } from '../hooks/useTasks';
@@ -19,7 +26,8 @@ export function Dashboard() {
   const [actionError, setActionError] = useState('');
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor),
   );
 
   function handleDragStart(): void {
@@ -167,7 +175,7 @@ export function Dashboard() {
               >
                 <Sparkles size={13} className="text-accent-purple" />
                 <p className="text-white/40 text-xs">
-                  {tasks.length} active task{tasks.length !== 1 ? 's' : ''} · drag to complete
+                  {tasks.length} active task{tasks.length !== 1 ? 's' : ''} · drag or use the keyboard to complete
                 </p>
               </motion.div>
 

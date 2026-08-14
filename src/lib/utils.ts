@@ -53,6 +53,20 @@ export function toUtcISOString(localDateTime: string): string {
   return new Date(localDateTime).toISOString();
 }
 
+export function eventOccursOnLocalDate(event: CalendarEvent, date: string): boolean {
+  const dayStart = new Date(`${date}T00:00:00`);
+  if (Number.isNaN(dayStart.getTime())) return false;
+
+  const nextDayStart = new Date(dayStart);
+  nextDayStart.setDate(nextDayStart.getDate() + 1);
+
+  const eventStart = new Date(event.start_time);
+  const eventEnd = new Date(event.end_time || event.start_time);
+  if (Number.isNaN(eventStart.getTime()) || Number.isNaN(eventEnd.getTime())) return false;
+
+  return eventStart < nextDayStart && eventEnd >= dayStart;
+}
+
 export function isToday(date: string | Date): boolean {
   const d = new Date(date);
   const today = new Date();
@@ -95,3 +109,4 @@ export function truncate(str: string, length: number): string {
   if (str.length <= length) return str;
   return str.slice(0, length) + '…';
 }
+import type { CalendarEvent } from '../types/database';

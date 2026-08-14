@@ -8,7 +8,7 @@ import { Input, Select } from '../ui/Input';
 import { Button } from '../ui/Button';
 
 const inviteSchema = z.object({
-  email: z.string().email('Please enter a valid email'),
+  email: z.string().email('Please enter a valid email').max(254, 'Email address is too long'),
   role: z.enum(['editor', 'viewer']),
 });
 
@@ -52,8 +52,14 @@ export function InviteMemberModal({ isOpen, onClose, onInvite, spaceName }: Invi
     }
   }
 
+  function closeModal() {
+    reset();
+    setInviteError('');
+    onClose();
+  }
+
   return (
-    <Modal isOpen={isOpen} onClose={() => { reset(); setInviteError(''); onClose(); }} title="Invite member">
+    <Modal isOpen={isOpen} onClose={closeModal} title="Invite member">
       <div className="flex items-center gap-3 mb-4 p-3 rounded-xl bg-accent-purple/10 border border-accent-purple/20">
         <UserPlus size={18} className="text-accent-purple flex-shrink-0" />
         <p className="text-sm text-white/70">
@@ -63,7 +69,7 @@ export function InviteMemberModal({ isOpen, onClose, onInvite, spaceName }: Invi
       </div>
 
       {inviteError && (
-        <p className="mb-3 text-sm text-red-400 px-1">{inviteError}</p>
+        <p role="alert" className="mb-3 text-sm text-red-400 px-1">{inviteError}</p>
       )}
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -84,7 +90,7 @@ export function InviteMemberModal({ isOpen, onClose, onInvite, spaceName }: Invi
           {...register('role')}
         />
         <div className="flex gap-3 pt-1">
-          <Button type="button" variant="secondary" onClick={onClose} className="flex-1">
+          <Button type="button" variant="secondary" onClick={closeModal} className="flex-1">
             Cancel
           </Button>
           <Button type="submit" loading={isSubmitting} className="flex-1">

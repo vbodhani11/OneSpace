@@ -2,7 +2,13 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Clock } from 'lucide-react';
 import type { CalendarEvent } from '../../types/database';
-import { formatTime, getDaysInMonth, getFirstDayOfMonth, toLocalDateKey } from '../../lib/utils';
+import {
+  eventOccursOnLocalDate,
+  formatTime,
+  getDaysInMonth,
+  getFirstDayOfMonth,
+  toLocalDateKey,
+} from '../../lib/utils';
 
 const DAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 const MONTHS = [
@@ -49,7 +55,7 @@ export function CalendarView({ events, selectedDate, onSelectDate, onSelectEvent
 
   function hasEvent(day: number) {
     const dateStr = getDateStr(day);
-    return events.some((e) => toLocalDateKey(e.start_time) === dateStr);
+    return events.some((event) => eventOccursOnLocalDate(event, dateStr));
   }
 
   function isToday(day: number) {
@@ -60,7 +66,7 @@ export function CalendarView({ events, selectedDate, onSelectDate, onSelectEvent
     return getDateStr(day) === selectedDate;
   }
 
-  const selectedEvents = events.filter((e) => toLocalDateKey(e.start_time) === selectedDate);
+  const selectedEvents = events.filter((event) => eventOccursOnLocalDate(event, selectedDate));
 
   return (
     <div>

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../contexts/useAuth';
 import type { CalendarEvent } from '../types/database';
-import { toLocalDateKey, toUtcISOString } from '../lib/utils';
+import { eventOccursOnLocalDate, toUtcISOString } from '../lib/utils';
 
 export function useCalendar() {
   const { user } = useAuth();
@@ -43,7 +43,7 @@ export function useCalendar() {
     description?: string;
     start_time: string;
     end_time?: string;
-    event_type?: string;
+    event_type?: CalendarEvent['event_type'];
   }) {
     if (!user) return { error: new Error('Not authenticated') };
 
@@ -100,9 +100,7 @@ export function useCalendar() {
   }
 
   function getEventsForDate(date: string): CalendarEvent[] {
-    return events.filter((e) => {
-      return toLocalDateKey(e.start_time) === date;
-    });
+    return events.filter((event) => eventOccursOnLocalDate(event, date));
   }
 
   return { events, loading, error, fetchEvents, createEvent, updateEvent, deleteEvent, getEventsForDate };

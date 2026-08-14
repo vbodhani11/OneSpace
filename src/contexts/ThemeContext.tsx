@@ -7,11 +7,15 @@ function getSystemTheme(): 'dark' | 'light' {
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
+function isTheme(value: string | null): value is Theme {
+  return value === 'dark' || value === 'light' || value === 'system';
+}
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const [theme, setThemeState] = useState<Theme>(() => {
-    const saved = localStorage.getItem('onespace-theme') as Theme | null;
-    return saved || 'dark';
+    const saved = localStorage.getItem('onespace-theme');
+    return isTheme(saved) ? saved : 'dark';
   });
   const [systemTheme, setSystemTheme] = useState<'dark' | 'light'>(getSystemTheme);
   const resolvedTheme = theme === 'system' ? systemTheme : theme;
@@ -37,10 +41,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       .from('user_settings')
       .select('theme')
       .eq('user_id', user.id)
-      .single()
-      .then(({ data }) => {
-        if (data?.theme) {
-          const savedTheme = data.theme as Theme;
+      .maybeSingle()
+      .then(({ data, error }) => {
+        const savedTheme = data?.theme || null;
+        if (!error && isTheme(savedTheme)) {
           setThemeState(savedTheme);
           localStorage.setItem('onespace-theme', savedTheme);
         }
@@ -48,29 +52,26 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }, [user]);
 
   const setTheme = useCallback(async (newTheme: Theme) => {
+    const previousTheme = theme;
     setThemeState(newTheme);
     localStorage.setItem('onespace-theme', newTheme);
 
     if (user) {
-      // Upsert user_settings with new theme
-      const { data: existing } = await supabase
+      const { error } = await supabase
         .from('user_settings')
-        .select('id')
-        .eq('user_id', user.id)
-        .single();
+        .upsert(
+          { user_id: user.id, theme: newTheme, updated_at: new Date().toISOString() },
+          { onConflict: 'user_id' },
+        );
 
-      if (existing) {
-        await supabase
-          .from('user_settings')
-          .update({ theme: newTheme, updated_at: new Date().toISOString() } as never)
-          .eq('user_id', user.id);
-      } else {
-        await supabase
-          .from('user_settings')
-          .insert({ user_id: user.id, theme: newTheme } as never);
+      if (error) {
+        setThemeState(previousTheme);
+        localStorage.setItem('onespace-theme', previousTheme);
+        return { error: error as Error };
       }
     }
-  }, [user]);
+    return { error: null };
+  }, [theme, user]);
 
   return (
     <ThemeContext.Provider value={{ theme, resolvedTheme, setTheme }}>

@@ -8,8 +8,8 @@ import { Button } from '../ui/Button';
 import type { Task } from '../../types/database';
 
 const taskSchema = z.object({
-  title: z.string().min(1, 'Title is required').max(100),
-  description: z.string().optional(),
+  title: z.string().trim().min(1, 'Title is required').max(160, 'Title is too long'),
+  description: z.string().max(2_000, 'Description is too long').optional(),
   priority: z.enum(['low', 'medium', 'high']),
   due_date: z.string().optional(),
 });

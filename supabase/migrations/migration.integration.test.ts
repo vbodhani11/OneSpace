@@ -8,7 +8,7 @@ const memberId = 'f2020758-ef0f-45a3-b9bb-49913b5fd30e';
 const spaceId = '229331ab-03fb-42ed-b0b5-65210809c9cc';
 const inviteToken = 'dd775828-a990-4e10-9694-6f034e5de3a7';
 
-const bootstrapSql = `
+const authBootstrapSql = `
 create role anon nologin;
 create role authenticated nologin;
 
@@ -27,109 +27,10 @@ $$;
 grant usage on schema auth to anon, authenticated;
 grant execute on function auth.uid() to anon, authenticated;
 grant execute on function auth.jwt() to anon, authenticated;
+`;
 
-create table public.profiles (
-  id uuid primary key references auth.users(id) on delete cascade,
-  full_name text,
-  email text,
-  avatar_url text,
-  created_at timestamptz default now(),
-  updated_at timestamptz default now()
-);
-create table public.tasks (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references auth.users(id) on delete cascade,
-  title text not null,
-  description text,
-  status text default 'active',
-  priority text default 'medium',
-  due_date date,
-  position_x numeric default 0,
-  position_y numeric default 0,
-  created_at timestamptz default now(),
-  updated_at timestamptz default now()
-);
-create table public.task_spaces (
-  id uuid primary key default gen_random_uuid(),
-  owner_id uuid not null references auth.users(id) on delete cascade,
-  name text not null,
-  description text,
-  created_at timestamptz default now(),
-  updated_at timestamptz default now()
-);
-create table public.task_space_members (
-  id uuid primary key default gen_random_uuid(),
-  space_id uuid not null references public.task_spaces(id) on delete cascade,
-  user_id uuid references auth.users(id) on delete cascade,
-  email text not null,
-  role text default 'editor',
-  status text default 'invited',
-  created_at timestamptz default now()
-);
-create table public.shared_tasks (
-  id uuid primary key default gen_random_uuid(),
-  space_id uuid not null references public.task_spaces(id) on delete cascade,
-  created_by uuid references auth.users(id) on delete set null,
-  title text not null,
-  description text,
-  status text default 'active',
-  priority text default 'medium',
-  due_date date,
-  created_at timestamptz default now(),
-  updated_at timestamptz default now()
-);
-create table public.journal_entries (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references auth.users(id) on delete cascade,
-  title text,
-  content text not null,
-  mood text,
-  entry_date date default current_date,
-  created_at timestamptz default now(),
-  updated_at timestamptz default now()
-);
-create table public.calendar_events (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references auth.users(id) on delete cascade,
-  title text not null,
-  description text,
-  start_time timestamptz not null,
-  end_time timestamptz,
-  event_type text default 'personal',
-  created_at timestamptz default now(),
-  updated_at timestamptz default now()
-);
-create table public.user_settings (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null unique references auth.users(id) on delete cascade,
-  theme text default 'dark',
-  notifications_enabled boolean default true,
-  sound_enabled boolean default true,
-  created_at timestamptz default now(),
-  updated_at timestamptz default now()
-);
-
-alter table public.profiles enable row level security;
-alter table public.tasks enable row level security;
-alter table public.task_spaces enable row level security;
-alter table public.task_space_members enable row level security;
-alter table public.shared_tasks enable row level security;
-alter table public.journal_entries enable row level security;
-alter table public.calendar_events enable row level security;
-alter table public.user_settings enable row level security;
-grant select, insert, update, delete on all tables in schema public to anon, authenticated;
-
-create function public.rls_auto_enable()
-returns event_trigger
-language plpgsql
-security definer
-set search_path = 'pg_catalog'
-as $$ begin return; end; $$;
-
+const fixtureSql = `
 insert into auth.users (id, email) values
-  ('${ownerId}', 'owner@example.com'),
-  ('${memberId}', 'member@example.com');
-insert into public.profiles (id, email) values
   ('${ownerId}', 'owner@example.com'),
   ('${memberId}', 'member@example.com');
 insert into public.task_spaces (id, owner_id, name)
@@ -140,8 +41,17 @@ insert into public.shared_tasks (space_id, created_by, title)
 values ('${spaceId}', '${ownerId}', 'Protected shared task');
 `;
 
+const baselineSql = readFileSync(
+  'supabase/baseline/20260813_initial_schema.sql',
+  'utf8',
+);
+
 const migration = readFileSync(
-  'supabase/migrations/20260813125501_stabilize_collaboration_security.sql',
+  'supabase/migrations/20260813173456_stabilize_collaboration_security.sql',
+  'utf8',
+);
+const invitationDeliveryMigration = readFileSync(
+  'supabase/migrations/20260814030913_harden_invitation_delivery.sql',
   'utf8',
 );
 
@@ -155,11 +65,22 @@ async function assumeMember(email = 'member@example.com') {
   `);
 }
 
+async function assumeOwner() {
+  await database.exec(`
+    set role authenticated;
+    select set_config('request.jwt.claim.sub', '${ownerId}', false);
+    select set_config('request.jwt.claims', '{"email":"owner@example.com"}', false);
+  `);
+}
+
 describe('collaboration security migration integration', () => {
   beforeAll(async () => {
     database = await PGlite.create();
-    await database.exec(bootstrapSql);
+    await database.exec(authBootstrapSql);
+    await database.exec(baselineSql);
+    await database.exec(fixtureSql);
     await database.exec(migration);
+    await database.exec(invitationDeliveryMigration);
 
     await database.exec(`
       reset role;
@@ -192,6 +113,93 @@ describe('collaboration security migration integration', () => {
       select status, user_id from public.task_space_members where space_id = '${spaceId}';
     `);
     expect(membership.rows[0]).toEqual({ status: 'invited', user_id: null });
+  });
+
+  it('claims delivery once, releases failures, enforces cooldown, and renews expired invites', async () => {
+    await database.exec('reset role;');
+    await assumeOwner();
+
+    const firstClaim = await database.query<{ member_id: string }>(`
+      select member_id
+      from public.claim_space_invites_for_delivery(
+        '${spaceId}'::uuid,
+        array['member@example.com']::text[]
+      );
+    `);
+    expect(firstClaim.rows).toHaveLength(1);
+
+    const duplicateClaim = await database.query<{ member_id: string }>(`
+      select member_id
+      from public.claim_space_invites_for_delivery(
+        '${spaceId}'::uuid,
+        array['member@example.com']::text[]
+      );
+    `);
+    expect(duplicateClaim.rows).toHaveLength(0);
+
+    await database.query(`
+      select public.complete_space_invite_delivery('${firstClaim.rows[0].member_id}'::uuid, false);
+    `);
+    const retryClaim = await database.query<{ member_id: string }>(`
+      select member_id
+      from public.claim_space_invites_for_delivery(
+        '${spaceId}'::uuid,
+        array['member@example.com']::text[]
+      );
+    `);
+    expect(retryClaim.rows).toHaveLength(1);
+
+    await database.query(`
+      select public.complete_space_invite_delivery('${retryClaim.rows[0].member_id}'::uuid, true);
+    `);
+    const deliveryState = await database.query<{
+      delivery_claimed_at: string | null;
+      invite_send_count: number;
+      last_invited_at: string | null;
+    }>(`
+      select delivery_claimed_at::text, invite_send_count, last_invited_at::text
+      from public.task_space_members
+      where id = '${retryClaim.rows[0].member_id}';
+    `);
+    expect(deliveryState.rows[0].delivery_claimed_at).toBeNull();
+    expect(deliveryState.rows[0].invite_send_count).toBe(1);
+    expect(deliveryState.rows[0].last_invited_at).not.toBeNull();
+
+    const cooldownClaim = await database.query<{ member_id: string }>(`
+      select member_id
+      from public.claim_space_invites_for_delivery(
+        '${spaceId}'::uuid,
+        array['member@example.com']::text[]
+      );
+    `);
+    expect(cooldownClaim.rows).toHaveLength(0);
+
+    await database.exec(`
+      reset role;
+      update public.task_space_members
+      set expires_at = now() - interval '1 day', invite_send_count = 5
+      where space_id = '${spaceId}';
+    `);
+    await assumeOwner();
+    const renewed = await database.query<{ token: string; token_expires_at: string }>(`
+      select token::text, token_expires_at::text
+      from public.renew_space_invite('${retryClaim.rows[0].member_id}'::uuid);
+    `);
+    expect(renewed.rows).toHaveLength(1);
+    expect(renewed.rows[0].token).not.toBe(inviteToken);
+    expect(new Date(renewed.rows[0].token_expires_at).getTime()).toBeGreaterThan(Date.now());
+
+    await database.exec(`
+      reset role;
+      update public.task_space_members
+      set
+        invite_token = '${inviteToken}',
+        expires_at = now() + interval '7 days',
+        last_invited_at = null,
+        invite_send_count = 0,
+        delivery_claimed_at = null
+      where space_id = '${spaceId}';
+    `);
   });
 
   it('rejects the wrong email and accepts the email-bound token', async () => {

@@ -8,6 +8,7 @@ import { TextToSpeechButton } from '../components/journal/TextToSpeechButton';
 import { Modal } from '../components/ui/Modal';
 import { Button } from '../components/ui/Button';
 import { EmptyState, LoadingState, ErrorState } from '../components/ui/Card';
+import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import type { JournalEntry } from '../types/database';
 import { formatDate, truncate } from '../lib/utils';
 
@@ -17,11 +18,19 @@ export function Journal() {
   const [editEntry, setEditEntry] = useState<JournalEntry | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [actionError, setActionError] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<JournalEntry | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   async function removeEntry(id: string) {
     setActionError('');
+    setDeleting(true);
     const result = await deleteEntry(id);
-    if (result.error) setActionError(result.error.message);
+    setDeleting(false);
+    if (result.error) {
+      setActionError(result.error.message);
+      return;
+    }
+    setDeleteTarget(null);
   }
 
   return (
@@ -92,7 +101,7 @@ export function Journal() {
                     <Edit2 size={14} />
                   </button>
                   <button
-                    onClick={() => void removeEntry(entry.id)}
+                    onClick={() => setDeleteTarget(entry)}
                     aria-label={`Delete ${entry.title || 'journal entry'}`}
                     className="p-1.5 text-white/30 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
                   >
@@ -143,6 +152,14 @@ export function Journal() {
           />
         )}
       </Modal>
+      <ConfirmDialog
+        isOpen={!!deleteTarget}
+        title="Delete journal entry?"
+        message={`“${deleteTarget?.title || 'Untitled entry'}” will be permanently removed.`}
+        loading={deleting}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={() => { if (deleteTarget) void removeEntry(deleteTarget.id); }}
+      />
     </div>
   );
 }

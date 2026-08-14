@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const migration = readFileSync(
-  'supabase/migrations/20260813125501_stabilize_collaboration_security.sql',
+  'supabase/migrations/20260813173456_stabilize_collaboration_security.sql',
   'utf8',
 );
 

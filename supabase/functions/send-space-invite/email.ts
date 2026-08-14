@@ -8,6 +8,10 @@ export function escapeHtml(value: string): string {
   })[character] || character);
 }
 
+export function sanitizeEmailHeader(value: string): string {
+  return value.replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200);
+}
+
 export function buildEmailHtml({
   spaceName,
   inviterName,

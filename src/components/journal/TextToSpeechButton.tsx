@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Volume2, VolumeX } from 'lucide-react';
 
@@ -10,12 +10,17 @@ export function TextToSpeechButton({ text }: TextToSpeechButtonProps) {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const isSupported = 'speechSynthesis' in window;
 
+  useEffect(() => () => {
+    window.speechSynthesis?.cancel();
+  }, []);
+
   function speak() {
     if (!isSupported || !text.trim()) return;
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.rate = 0.95;
     utterance.pitch = 1;
+    utterance.lang = navigator.language || 'en-US';
     utterance.onstart = () => setIsSpeaking(true);
     utterance.onend = () => setIsSpeaking(false);
     utterance.onerror = () => setIsSpeaking(false);
@@ -34,6 +39,7 @@ export function TextToSpeechButton({ text }: TextToSpeechButtonProps) {
       type="button"
       onClick={isSpeaking ? stop : speak}
       disabled={!text.trim()}
+      aria-pressed={isSpeaking}
       className={`
         flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200
         disabled:opacity-40 disabled:cursor-not-allowed

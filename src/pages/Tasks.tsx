@@ -13,7 +13,8 @@ import { TaskForm } from '../components/tasks/TaskForm';
 import { Modal } from '../components/ui/Modal';
 import { Button } from '../components/ui/Button';
 import { EmptyState, LoadingState, ErrorState } from '../components/ui/Card';
-import type { Task } from '../types/database';
+import { ConfirmDialog } from '../components/ui/ConfirmDialog';
+import type { Task, TaskSpace, TaskSpaceMember } from '../types/database';
 
 type Tab = 'personal' | 'spaces';
 type StatusFilter = 'all' | 'active' | 'completed';
@@ -25,10 +26,12 @@ export function Tasks() {
     <div>
       <PageHeader title="Tasks" subtitle="Manage your work" />
 
-      <div className="flex gap-2 mb-5 p-1 glass-card rounded-xl">
+      <div role="tablist" aria-label="Task collections" className="flex gap-2 mb-5 p-1 glass-card rounded-xl">
         {([['personal', CheckSquare, 'Personal'], ['spaces', Users, 'Shared Spaces']] as const).map(([tab, Icon, label]) => (
           <button
             key={tab}
+            role="tab"
+            aria-selected={activeTab === tab}
             onClick={() => setActiveTab(tab)}
             className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
               activeTab === tab
@@ -71,6 +74,7 @@ function PersonalTasksTab() {
           {(['all', 'active', 'completed'] as StatusFilter[]).map((s) => (
             <button
               key={s}
+              aria-pressed={statusFilter === s}
               onClick={() => setStatusFilter(s)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all capitalize ${
                 statusFilter === s
@@ -140,6 +144,9 @@ function SharedSpacesTab() {
   const { spaces, loading, error, fetchSpaces, createSpace, deleteSpace } = useTaskSpaces();
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedSpaceId, setSelectedSpaceId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<TaskSpace | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [actionError, setActionError] = useState('');
 
   if (selectedSpaceId) {
     const space = spaces.find((s) => s.id === selectedSpaceId);
@@ -164,6 +171,7 @@ function SharedSpacesTab() {
 
       {loading && <LoadingState />}
       {error && <ErrorState message={error} onRetry={fetchSpaces} />}
+      {actionError && <p role="alert" className="mb-4 text-sm text-red-400">{actionError}</p>}
 
       {!loading && spaces.length === 0 && (
         <EmptyState
@@ -180,7 +188,7 @@ function SharedSpacesTab() {
             <SharedSpaceCard
               space={space}
               onClick={() => setSelectedSpaceId(space.id)}
-              onDelete={async (id) => await deleteSpace(id)}
+              onDelete={() => setDeleteTarget(space)}
             />
           </div>
         ))}
@@ -192,6 +200,22 @@ function SharedSpacesTab() {
         onCreate={async (name, desc, invitees) => {
           const result = await createSpace(name, desc, invitees);
           return result;
+        }}
+      />
+      <ConfirmDialog
+        isOpen={!!deleteTarget}
+        title="Delete shared space?"
+        message={`“${deleteTarget?.name || 'This space'}” and all of its shared tasks and invitations will be permanently removed.`}
+        loading={deleting}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={() => {
+          if (!deleteTarget) return;
+          setDeleting(true);
+          setActionError('');
+          void deleteSpace(deleteTarget.id).then((result) => {
+            if (result.error) setActionError(result.error.message);
+            else setDeleteTarget(null);
+          }).finally(() => setDeleting(false));
         }}
       />
     </div>
@@ -214,6 +238,9 @@ function SpaceDetailView({ spaceId, spaceName, spaceOwnerId, onBack }: {
   const [createTaskOpen, setCreateTaskOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
+  const [memberDeleteTarget, setMemberDeleteTarget] = useState<TaskSpaceMember | null>(null);
+  const [removingMember, setRemovingMember] = useState(false);
+  const [memberError, setMemberError] = useState('');
 
   const isOwner = user?.id === spaceOwnerId;
   const canEdit = userRole === 'owner' || userRole === 'editor';
@@ -234,7 +261,7 @@ function SpaceDetailView({ spaceId, spaceName, spaceOwnerId, onBack }: {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button aria-label="Show members" size="sm" variant="secondary" onClick={() => setShowMembers((v) => !v)}>
+          <Button aria-label="Show members" aria-pressed={showMembers} size="sm" variant="secondary" onClick={() => setShowMembers((v) => !v)}>
             <Users size={14} />
           </Button>
           {isOwner && (
@@ -267,7 +294,7 @@ function SpaceDetailView({ spaceId, spaceName, spaceOwnerId, onBack }: {
                 </div>
                 {isOwner && (
                   <button
-                    onClick={() => removeMember(m.id)}
+                    onClick={() => setMemberDeleteTarget(m)}
                     aria-label={`Remove ${m.email}`}
                     className="p-1.5 text-white/30 hover:text-red-400 transition-colors"
                   >
@@ -282,6 +309,7 @@ function SpaceDetailView({ spaceId, spaceName, spaceOwnerId, onBack }: {
 
       {loading && <LoadingState />}
       {error && <ErrorState message={error} onRetry={fetchDetails} />}
+      {memberError && <p role="alert" className="mb-4 text-sm text-red-400">{memberError}</p>}
 
       {!loading && tasks.length === 0 && (
         <EmptyState
@@ -333,6 +361,23 @@ function SpaceDetailView({ spaceId, spaceName, spaceOwnerId, onBack }: {
         onClose={() => setInviteOpen(false)}
         onInvite={(email, role) => inviteMember(email, role)}
         spaceName={spaceName}
+      />
+      <ConfirmDialog
+        isOpen={!!memberDeleteTarget}
+        title="Remove member?"
+        message={`${memberDeleteTarget?.email || 'This member'} will lose access to the shared space.`}
+        confirmLabel="Remove"
+        loading={removingMember}
+        onClose={() => setMemberDeleteTarget(null)}
+        onConfirm={() => {
+          if (!memberDeleteTarget) return;
+          setRemovingMember(true);
+          setMemberError('');
+          void removeMember(memberDeleteTarget.id).then((result) => {
+            if (result.error) setMemberError(result.error.message);
+            else setMemberDeleteTarget(null);
+          }).finally(() => setRemovingMember(false));
+        }}
       />
     </div>
   );

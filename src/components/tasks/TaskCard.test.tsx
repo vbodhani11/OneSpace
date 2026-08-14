@@ -41,9 +41,12 @@ describe('TaskCard', () => {
       task.id,
       expect.objectContaining({ title: 'Bring grapes' }),
     ));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Edit task' })).not.toBeInTheDocument());
 
     await user.click(screen.getByRole('button', { name: 'Delete Bring apples' }));
-    expect(onDelete).toHaveBeenCalledWith(task.id);
+    expect(onDelete).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
+    await waitFor(() => expect(onDelete).toHaveBeenCalledWith(task.id));
   });
 
   it('keeps the edit form open and explains a failed update', async () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildEmailHtml, escapeHtml } from './email';
+import { buildEmailHtml, escapeHtml, sanitizeEmailHeader } from './email';
 
 describe('invitation email rendering', () => {
   it('escapes user-controlled content', () => {
@@ -18,5 +18,11 @@ describe('invitation email rendering', () => {
     expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;');
     expect(html).toContain('A&amp;B');
     expect(html).toContain('as a viewer');
+  });
+
+  it('removes line breaks from email headers', () => {
+    expect(sanitizeEmailHeader('Project\r\nBcc: attacker@example.com')).toBe(
+      'Project Bcc: attacker@example.com',
+    );
   });
 });

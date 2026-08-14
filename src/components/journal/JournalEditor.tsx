@@ -8,10 +8,11 @@ import { Button } from '../ui/Button';
 import { SpeechToTextButton } from './SpeechToTextButton';
 import { TextToSpeechButton } from './TextToSpeechButton';
 import type { JournalEntry } from '../../types/database';
+import { toLocalDateKey } from '../../lib/utils';
 
 const journalSchema = z.object({
-  title: z.string().optional(),
-  content: z.string().min(1, 'Write something...'),
+  title: z.string().max(120, 'Title is too long').optional(),
+  content: z.string().min(1, 'Write something...').max(20_000, 'Entry is too long'),
   mood: z.string().optional(),
   entry_date: z.string(),
 });
@@ -29,6 +30,7 @@ interface JournalEditorProps {
 
 export function JournalEditor({ initialData, onSubmit, onCancel, submitLabel = 'Save entry' }: JournalEditorProps) {
   const [submitError, setSubmitError] = useState('');
+  const [speechLanguage, setSpeechLanguage] = useState(() => navigator.language || 'en-US');
   const {
     register,
     handleSubmit,
@@ -41,7 +43,7 @@ export function JournalEditor({ initialData, onSubmit, onCancel, submitLabel = '
       title: initialData?.title || '',
       content: initialData?.content || '',
       mood: initialData?.mood || '',
-      entry_date: initialData?.entry_date || new Date().toISOString().split('T')[0],
+      entry_date: initialData?.entry_date || toLocalDateKey(new Date()),
     },
   });
 
@@ -91,13 +93,26 @@ export function JournalEditor({ initialData, onSubmit, onCancel, submitLabel = '
 
       <div>
         <div className="flex items-center justify-between mb-1.5">
-          <label className="text-sm font-medium text-white/70">Journal entry</label>
+          <label htmlFor="journal-content" className="text-sm font-medium text-white/70">Journal entry</label>
           <div className="flex items-center gap-2">
-            <SpeechToTextButton onResult={handleSpeechResult} />
+            <label className="sr-only" htmlFor="speech-language">Voice language</label>
+            <select
+              id="speech-language"
+              value={speechLanguage}
+              onChange={(event) => setSpeechLanguage(event.target.value)}
+              className="rounded-lg border border-white/10 bg-white/5 px-2 py-2 text-xs text-white/60"
+              title="Voice language"
+            >
+              <option value="en-US" className="bg-space-800">English</option>
+              <option value="hi-IN" className="bg-space-800">Hindi</option>
+              <option value="te-IN" className="bg-space-800">Telugu</option>
+            </select>
+            <SpeechToTextButton onResult={handleSpeechResult} language={speechLanguage} />
             <TextToSpeechButton text={content || ''} />
           </div>
         </div>
         <Textarea
+          id="journal-content"
           placeholder="What's on your mind today?..."
           rows={10}
           error={errors.content?.message}

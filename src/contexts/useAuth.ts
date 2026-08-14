@@ -4,6 +4,7 @@ import type { Session, User } from '@supabase/supabase-js';
 export interface AuthContextType {
   user: User | null;
   session: Session | null;
+  isPasswordRecovery: boolean;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (
@@ -12,7 +13,10 @@ export interface AuthContextType {
     fullName: string,
   ) => Promise<{ error: Error | null; needsConfirmation?: boolean }>;
   signInWithGoogle: () => Promise<{ error: Error | null }>;
-  signOut: () => Promise<void>;
+  requestPasswordReset: (email: string) => Promise<{ error: Error | null }>;
+  updatePassword: (password: string) => Promise<{ error: Error | null }>;
+  resendConfirmation: (email: string) => Promise<{ error: Error | null }>;
+  signOut: () => Promise<{ error: Error | null }>;
   postLoginRedirect: () => string;
 }
 

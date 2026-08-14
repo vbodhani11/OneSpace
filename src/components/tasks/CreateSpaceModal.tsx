@@ -29,7 +29,8 @@ interface CreateSpaceModalProps {
 }
 
 function isValidEmail(email: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const normalizedEmail = email.trim();
+  return normalizedEmail.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail);
 }
 
 export function CreateSpaceModal({ isOpen, onClose, onCreate }: CreateSpaceModalProps) {
@@ -82,12 +83,21 @@ export function CreateSpaceModal({ isOpen, onClose, onCreate }: CreateSpaceModal
   }
 
   async function handleCreate() {
-    if (!name.trim()) return;
+    const normalizedName = name.trim();
+    if (!normalizedName) return;
+    if (normalizedName.length > 100) {
+      setCreateError('Space name must be 100 characters or fewer.');
+      return;
+    }
+    if (description.trim().length > 2_000) {
+      setCreateError('Description must be 2,000 characters or fewer.');
+      return;
+    }
     setCreating(true);
     setCreateError('');
     try {
       const result = await onCreate(
-        name.trim(),
+        normalizedName,
         description.trim(),
         invitees.map(({ email, role }) => ({ email, role }))
       );
@@ -162,6 +172,7 @@ export function CreateSpaceModal({ isOpen, onClose, onCreate }: CreateSpaceModal
               placeholder="e.g. Team Project, Sprint Tasks, Family Chores"
               value={name}
               onChange={(e) => setName(e.target.value)}
+              maxLength={100}
               autoFocus
             />
             <Textarea
@@ -170,6 +181,7 @@ export function CreateSpaceModal({ isOpen, onClose, onCreate }: CreateSpaceModal
               rows={3}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
+              maxLength={2_000}
             />
 
             <div className="flex gap-3 pt-1">
@@ -282,7 +294,7 @@ export function CreateSpaceModal({ isOpen, onClose, onCreate }: CreateSpaceModal
             )}
 
             {createError && (
-              <p className="flex items-center gap-2 text-sm text-red-400">
+              <p role="alert" className="flex items-center gap-2 text-sm text-red-400">
                 <AlertCircle size={15} />
                 {createError}
               </p>
@@ -337,7 +349,7 @@ export function CreateSpaceModal({ isOpen, onClose, onCreate }: CreateSpaceModal
             )}
 
             <Button onClick={handleClose} className="w-full">
-              Open space
+              Back to shared spaces
             </Button>
           </motion.div>
         )}

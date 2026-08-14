@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../contexts/useAuth';
 import type { JournalEntry } from '../types/database';
+import { toLocalDateKey } from '../lib/utils';
 
 export function useJournal() {
   const { user } = useAuth();
@@ -52,7 +53,7 @@ export function useJournal() {
         title: entryData.title || null,
         content: entryData.content,
         mood: entryData.mood || null,
-        entry_date: entryData.entry_date || new Date().toISOString().split('T')[0],
+        entry_date: entryData.entry_date || toLocalDateKey(new Date()),
       })
       .select()
       .single();
