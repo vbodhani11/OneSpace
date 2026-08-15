@@ -13,7 +13,7 @@
 - **Calendar** — Visualize your schedule and keep track of upcoming events.
 - **Journal** — Write private journal entries to capture thoughts, ideas, or daily reflections.
 - **Profile & Settings** — Customize your experience and manage your account.
-- **Invite System** — Invite collaborators with email-bound links that expire after seven days.
+- **Invite System** — Invite collaborators with email-bound links that remain valid until accepted or revoked by the space owner.
 
 ---
 
@@ -39,7 +39,7 @@
 src/
 ├── components/       # Reusable UI components
 ├── contexts/         # Auth and Theme context providers
-├── hooks/            # Custom React hooks
+├── hooks/             # Custom React hooks
 ├── lib/              # Supabase client and utilities
 ├── pages/            # App pages (Dashboard, Tasks, Calendar, Journal, etc.)
 ├── types/            # TypeScript type definitions
