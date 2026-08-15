@@ -9,6 +9,10 @@ import { AuthPageShell } from '../components/auth/AuthPageShell';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { passwordSchema } from '../lib/validation';
+import {
+  clearPasswordRecovery,
+  hasPasswordRecoveryCallbackError,
+} from '../lib/passwordRecovery';
 
 const schema = z.object({
   password: passwordSchema,
@@ -20,10 +24,10 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>;
 
 export function ResetPassword() {
-  const { session, isPasswordRecovery, loading, updatePassword } = useAuth();
+  const { session, isPasswordRecovery, loading, updatePassword, signOut } = useAuth();
   const navigate = useNavigate();
   const [error, setError] = useState('');
-  const [updated, setUpdated] = useState(false);
+  const [callbackError] = useState(hasPasswordRecoveryCallbackError);
   const {
     register,
     handleSubmit,
@@ -37,30 +41,36 @@ export function ResetPassword() {
       setError(result.error.message || 'Your password could not be updated.');
       return;
     }
-    setUpdated(true);
+
+    const signOutResult = await signOut();
+    if (signOutResult.error) {
+      setError('Your password was saved, but we could not safely end the reset session. Please try again.');
+      return;
+    }
+
+    navigate('/login', { replace: true, state: { passwordReset: true } });
   }
 
   if (loading) {
     return <AuthPageShell><p role="status" className="text-white/60 text-sm">Checking reset link…</p></AuthPageShell>;
   }
 
-  if (updated) {
-    return (
-      <AuthPageShell>
-        <div role="status" className="rounded-xl border border-green-500/30 bg-green-500/15 p-4 text-sm text-green-200 mb-5">
-          Your password was updated successfully.
-        </div>
-        <Button className="w-full" onClick={() => navigate('/dashboard', { replace: true })}>Continue to OneSpace</Button>
-      </AuthPageShell>
-    );
-  }
-
-  if (!session || !isPasswordRecovery) {
+  if (callbackError || !session || !isPasswordRecovery) {
     return (
       <AuthPageShell>
         <h1 className="text-xl font-bold text-white mb-2">Reset link unavailable</h1>
-        <p className="text-white/45 text-sm mb-5">This link is invalid or expired. Request a new one to continue.</p>
-        <Button className="w-full" onClick={() => navigate('/forgot-password')}>Request a new link</Button>
+        <p className="text-white/45 text-sm mb-5">
+          This link is invalid, expired, or was already used. Request one new link and use only the newest email.
+        </p>
+        <Button
+          className="w-full"
+          onClick={() => {
+            clearPasswordRecovery();
+            navigate('/forgot-password');
+          }}
+        >
+          Request a new link
+        </Button>
       </AuthPageShell>
     );
   }
@@ -87,7 +97,7 @@ export function ResetPassword() {
           error={errors.confirmPassword?.message}
           {...register('confirmPassword')}
         />
-        <Button type="submit" loading={isSubmitting} className="w-full" size="lg">Update password</Button>
+        <Button type="submit" loading={isSubmitting} className="w-full" size="lg">Save new password</Button>
       </form>
     </AuthPageShell>
   );

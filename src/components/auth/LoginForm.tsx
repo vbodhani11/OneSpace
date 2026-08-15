@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mail, Lock } from 'lucide-react';
 import { useForm } from 'react-hook-form';
@@ -19,6 +19,10 @@ type LoginFormData = z.infer<typeof loginSchema>;
 export function LoginForm() {
   const { signIn, signInWithGoogle, resendConfirmation, postLoginRedirect } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const passwordWasReset = Boolean(
+    (location.state as { passwordReset?: boolean } | null)?.passwordReset,
+  );
   const [authError, setAuthError] = useState<string | null>(null);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [resendStatus, setResendStatus] = useState<string | null>(null);
@@ -78,6 +82,16 @@ export function LoginForm() {
       </div>
 
       <AnimatePresence>
+        {passwordWasReset && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-4 p-3 rounded-xl bg-green-500/15 border border-green-500/30 text-green-200 text-sm"
+            role="status"
+          >
+            Password saved. Sign in with your new password.
+          </motion.div>
+        )}
         {authError && (
           <motion.div
             initial={{ opacity: 0, y: -10 }}

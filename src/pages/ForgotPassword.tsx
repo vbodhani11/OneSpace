@@ -8,6 +8,7 @@ import { useAuth } from '../contexts/useAuth';
 import { AuthPageShell } from '../components/auth/AuthPageShell';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
+import { isPasswordResetRateLimitError } from '../lib/passwordRecovery';
 
 const schema = z.object({ email: z.string().email('Please enter a valid email') });
 type FormData = z.infer<typeof schema>;
@@ -15,6 +16,7 @@ type FormData = z.infer<typeof schema>;
 export function ForgotPassword() {
   const { requestPasswordReset } = useAuth();
   const [sent, setSent] = useState(false);
+  const [rateLimited, setRateLimited] = useState(false);
   const [error, setError] = useState('');
   const {
     register,
@@ -26,7 +28,11 @@ export function ForgotPassword() {
     setError('');
     const result = await requestPasswordReset(email);
     if (result.error) {
-      setError(result.error.message || 'The reset email could not be sent.');
+      if (isPasswordResetRateLimitError(result.error)) {
+        setRateLimited(true);
+      } else {
+        setError('We could not send a reset email right now. Please try again in a few minutes.');
+      }
       return;
     }
     setSent(true);
@@ -42,7 +48,16 @@ export function ForgotPassword() {
       {sent ? (
         <div role="status" className="space-y-5">
           <div className="rounded-xl border border-green-500/30 bg-green-500/15 p-4 text-sm text-green-200">
-            If an account exists for that email, a password reset link is on its way. Check your inbox and spam folder.
+            If an account exists for that email, a password reset link is on its way. Check your inbox and spam folder, then use the newest email. Each link works only once.
+          </div>
+          <Link to="/login" className="inline-flex items-center gap-2 text-sm text-accent-cyan hover:underline">
+            <ArrowLeft size={15} /> Back to sign in
+          </Link>
+        </div>
+      ) : rateLimited ? (
+        <div role="alert" className="space-y-5">
+          <div className="rounded-xl border border-amber-500/30 bg-amber-500/15 p-4 text-sm text-amber-100">
+            Too many reset links were requested in a short time. Please wait a few minutes before requesting another one, and use only the newest email. Each reset link works once.
           </div>
           <Link to="/login" className="inline-flex items-center gap-2 text-sm text-accent-cyan hover:underline">
             <ArrowLeft size={15} /> Back to sign in

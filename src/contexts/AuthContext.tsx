@@ -1,6 +1,12 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { User, Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabaseClient';
+import {
+  clearPasswordRecovery,
+  hasPendingPasswordRecovery,
+  rememberPasswordRecovery,
+} from '../lib/passwordRecovery';
 import { AuthContext } from './useAuth';
 
 async function ensureProfile(user: User) {
@@ -16,9 +22,10 @@ async function ensureProfile(user: User) {
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(hasPendingPasswordRecovery);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -29,18 +36,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
+
+      if (session && hasPendingPasswordRecovery()) {
+        setIsPasswordRecovery(true);
+        navigate('/reset-password', { replace: true });
+      }
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
 
-        if (_event === 'PASSWORD_RECOVERY') setIsPasswordRecovery(true);
-        if (_event === 'SIGNED_OUT') setIsPasswordRecovery(false);
+        if (event === 'PASSWORD_RECOVERY') {
+          rememberPasswordRecovery();
+          setIsPasswordRecovery(true);
+          navigate('/reset-password', { replace: true });
+        }
 
-        if (_event === 'SIGNED_IN' && session?.user) {
+        if (event === 'SIGNED_OUT') {
+          clearPasswordRecovery();
+          setIsPasswordRecovery(false);
+        }
+
+        if (event === 'SIGNED_IN' && session?.user) {
           void ensureProfile(session.user);
         }
       }
@@ -50,9 +70,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       active = false;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [navigate]);
 
   async function signIn(email: string, password: string) {
+    clearPasswordRecovery();
+    setIsPasswordRecovery(false);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     return { error: error as Error | null };
   }
@@ -90,6 +112,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function signInWithGoogle() {
+    clearPasswordRecovery();
+    setIsPasswordRecovery(false);
     const pendingInvite = sessionStorage.getItem('pending-invite');
     const redirectTo = pendingInvite
       ? `${window.location.origin}/invite/${pendingInvite}`
@@ -111,7 +135,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function updatePassword(password: string) {
     const { error } = await supabase.auth.updateUser({ password });
-    if (!error) setIsPasswordRecovery(false);
     return { error: error as Error | null };
   }
 
@@ -127,6 +150,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function signOut() {
     const { error } = await supabase.auth.signOut();
     if (!error) {
+      clearPasswordRecovery();
+      setIsPasswordRecovery(false);
       setUser(null);
       setSession(null);
     }
