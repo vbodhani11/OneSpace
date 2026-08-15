@@ -54,7 +54,7 @@ export function buildEmailHtml({
         </td></tr>
         <tr><td style="text-align:center;padding-top:8px;">
           <p style="margin:0;color:#64748b;font-size:12px;line-height:1.6;">
-            This private link expires after seven days and only works with the invited email address.
+            This private link remains valid until the invitation is accepted or revoked by the space owner, and it only works with the invited email address.
           </p>
           <p style="margin:20px 0 0;color:#475569;font-size:11px;">If you weren't expecting this invitation, you can ignore this email.</p>
         </td></tr>
