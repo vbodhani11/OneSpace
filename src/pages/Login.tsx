@@ -5,7 +5,7 @@ import { LoginForm } from '../components/auth/LoginForm';
 import { SpaceBackground } from '../components/dashboard/SpaceBackground';
 
 export function Login() {
-  const { user, loading, postLoginRedirect } = useAuth();
+  const { user, isPasswordRecovery, loading, postLoginRedirect } = useAuth();
 
   if (loading) {
     return (
@@ -17,6 +17,10 @@ export function Login() {
         />
       </div>
     );
+  }
+
+  if (user && isPasswordRecovery) {
+    return <Navigate to="/reset-password" replace />;
   }
 
   if (user) {
