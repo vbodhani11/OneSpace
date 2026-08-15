@@ -20,10 +20,9 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>;
 
 export function ResetPassword() {
-  const { session, isPasswordRecovery, loading, updatePassword } = useAuth();
+  const { session, isPasswordRecovery, loading, updatePassword, signOut } = useAuth();
   const navigate = useNavigate();
   const [error, setError] = useState('');
-  const [updated, setUpdated] = useState(false);
   const {
     register,
     handleSubmit,
@@ -37,22 +36,21 @@ export function ResetPassword() {
       setError(result.error.message || 'Your password could not be updated.');
       return;
     }
-    setUpdated(true);
+
+    const signOutResult = await signOut();
+    if (signOutResult.error) {
+      setError('Your password was updated, but we could not sign you out. Please try again.');
+      return;
+    }
+
+    navigate('/login', {
+      replace: true,
+      state: { passwordReset: true },
+    });
   }
 
   if (loading) {
     return <AuthPageShell><p role="status" className="text-white/60 text-sm">Checking reset link…</p></AuthPageShell>;
-  }
-
-  if (updated) {
-    return (
-      <AuthPageShell>
-        <div role="status" className="rounded-xl border border-green-500/30 bg-green-500/15 p-4 text-sm text-green-200 mb-5">
-          Your password was updated successfully.
-        </div>
-        <Button className="w-full" onClick={() => navigate('/dashboard', { replace: true })}>Continue to OneSpace</Button>
-      </AuthPageShell>
-    );
   }
 
   if (!session || !isPasswordRecovery) {
