@@ -54,6 +54,10 @@ const invitationDeliveryMigration = readFileSync(
   'supabase/migrations/20260814030913_harden_invitation_delivery.sql',
   'utf8',
 );
+const nonExpiringInviteMigration = readFileSync(
+  'supabase/migrations/20260815163500_make_space_invites_non_expiring.sql',
+  'utf8',
+);
 
 let database: PGlite;
 
@@ -81,11 +85,12 @@ describe('collaboration security migration integration', () => {
     await database.exec(fixtureSql);
     await database.exec(migration);
     await database.exec(invitationDeliveryMigration);
+    await database.exec(nonExpiringInviteMigration);
 
     await database.exec(`
       reset role;
       update public.task_space_members
-      set invite_token = '${inviteToken}', expires_at = now() + interval '7 days'
+      set invite_token = '${inviteToken}', expires_at = null
       where space_id = '${spaceId}' and email = 'member@example.com';
     `);
   }, 30_000);
@@ -115,7 +120,7 @@ describe('collaboration security migration integration', () => {
     expect(membership.rows[0]).toEqual({ status: 'invited', user_id: null });
   });
 
-  it('claims delivery once, releases failures, enforces cooldown, and renews expired invites', async () => {
+  it('claims delivery once, releases failures, enforces cooldown, and refreshes tokens without expiry', async () => {
     await database.exec('reset role;');
     await assumeOwner();
 
@@ -156,14 +161,16 @@ describe('collaboration security migration integration', () => {
       delivery_claimed_at: string | null;
       invite_send_count: number;
       last_invited_at: string | null;
+      expires_at: string | null;
     }>(`
-      select delivery_claimed_at::text, invite_send_count, last_invited_at::text
+      select delivery_claimed_at::text, invite_send_count, last_invited_at::text, expires_at::text
       from public.task_space_members
       where id = '${retryClaim.rows[0].member_id}';
     `);
     expect(deliveryState.rows[0].delivery_claimed_at).toBeNull();
     expect(deliveryState.rows[0].invite_send_count).toBe(1);
     expect(deliveryState.rows[0].last_invited_at).not.toBeNull();
+    expect(deliveryState.rows[0].expires_at).toBeNull();
 
     const cooldownClaim = await database.query<{ member_id: string }>(`
       select member_id
@@ -177,24 +184,24 @@ describe('collaboration security migration integration', () => {
     await database.exec(`
       reset role;
       update public.task_space_members
-      set expires_at = now() - interval '1 day', invite_send_count = 5
+      set expires_at = null, invite_send_count = 5
       where space_id = '${spaceId}';
     `);
     await assumeOwner();
-    const renewed = await database.query<{ token: string; token_expires_at: string }>(`
+    const renewed = await database.query<{ token: string; token_expires_at: string | null }>(`
       select token::text, token_expires_at::text
       from public.renew_space_invite('${retryClaim.rows[0].member_id}'::uuid);
     `);
     expect(renewed.rows).toHaveLength(1);
     expect(renewed.rows[0].token).not.toBe(inviteToken);
-    expect(new Date(renewed.rows[0].token_expires_at).getTime()).toBeGreaterThan(Date.now());
+    expect(renewed.rows[0].token_expires_at).toBeNull();
 
     await database.exec(`
       reset role;
       update public.task_space_members
       set
         invite_token = '${inviteToken}',
-        expires_at = now() + interval '7 days',
+        expires_at = null,
         last_invited_at = null,
         invite_send_count = 0,
         delivery_claimed_at = null
@@ -202,7 +209,17 @@ describe('collaboration security migration integration', () => {
     `);
   });
 
-  it('rejects the wrong email and accepts the email-bound token', async () => {
+  it('keeps pending links valid without an expiry and accepts the email-bound token', async () => {
+    await database.exec('set role anon;');
+    const preview = await database.query<{ space_id: string; expires_at: string | null }>(`
+      select space_id::text, expires_at::text
+      from public.get_space_invite_preview('${inviteToken}'::uuid);
+    `);
+    expect(preview.rows).toHaveLength(1);
+    expect(preview.rows[0].space_id).toBe(spaceId);
+    expect(preview.rows[0].expires_at).toBeNull();
+
+    await database.exec('reset role;');
     await assumeMember('different@example.com');
     await expect(database.query(`
       select public.accept_space_invite('${inviteToken}'::uuid);
@@ -215,12 +232,14 @@ describe('collaboration security migration integration', () => {
     `);
     expect(accepted.rows[0].space_id).toBe(spaceId);
 
-    const afterAcceptance = await database.query<{ count: number; invite_token: string | null }>(`
+    const afterAcceptance = await database.query<{ count: number; invite_token: string | null; expires_at: string | null }>(`
       select
         (select count(*)::int from public.task_spaces where id = '${spaceId}') as count,
-        (select invite_token::text from public.task_space_members where space_id = '${spaceId}') as invite_token;
+        (select invite_token::text from public.task_space_members where space_id = '${spaceId}') as invite_token,
+        (select expires_at::text from public.task_space_members where space_id = '${spaceId}') as expires_at;
     `);
     expect(afterAcceptance.rows[0].count).toBe(1);
     expect(afterAcceptance.rows[0].invite_token).toBeNull();
+    expect(afterAcceptance.rows[0].expires_at).toBeNull();
   });
 });
