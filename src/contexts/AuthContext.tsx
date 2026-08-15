@@ -1,7 +1,40 @@
 import { useEffect, useState } from 'react';
 import type { User, Session } from '@supabase/supabase-js';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { AuthContext } from './useAuth';
+
+const PASSWORD_RECOVERY_STORAGE_KEY = 'onespace-password-recovery';
+
+function isRecoveryCallbackUrl() {
+  if (typeof window === 'undefined') return false;
+
+  const search = new URLSearchParams(window.location.search);
+  const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+  return search.get('type') === 'recovery' || hash.get('type') === 'recovery';
+}
+
+function hasPendingPasswordRecovery() {
+  if (typeof sessionStorage === 'undefined') return isRecoveryCallbackUrl();
+
+  try {
+    return sessionStorage.getItem(PASSWORD_RECOVERY_STORAGE_KEY) === 'true'
+      || isRecoveryCallbackUrl();
+  } catch {
+    return isRecoveryCallbackUrl();
+  }
+}
+
+function rememberPasswordRecovery(active: boolean) {
+  if (typeof sessionStorage === 'undefined') return;
+
+  try {
+    if (active) sessionStorage.setItem(PASSWORD_RECOVERY_STORAGE_KEY, 'true');
+    else sessionStorage.removeItem(PASSWORD_RECOVERY_STORAGE_KEY);
+  } catch {
+    // Recovery routing still works when storage is unavailable.
+  }
+}
 
 async function ensureProfile(user: User) {
   await supabase.from('profiles').upsert(
@@ -16,9 +49,10 @@ async function ensureProfile(user: User) {
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(hasPendingPasswordRecovery);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -37,8 +71,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(session?.user ?? null);
         setLoading(false);
 
-        if (_event === 'PASSWORD_RECOVERY') setIsPasswordRecovery(true);
-        if (_event === 'SIGNED_OUT') setIsPasswordRecovery(false);
+        if (_event === 'PASSWORD_RECOVERY') {
+          rememberPasswordRecovery(true);
+          setIsPasswordRecovery(true);
+          if (window.location.pathname !== '/reset-password') {
+            navigate('/reset-password', { replace: true });
+          }
+        }
+
+        if (_event === 'SIGNED_OUT') {
+          rememberPasswordRecovery(false);
+          setIsPasswordRecovery(false);
+        }
 
         if (_event === 'SIGNED_IN' && session?.user) {
           void ensureProfile(session.user);
@@ -50,9 +94,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       active = false;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [navigate]);
 
   async function signIn(email: string, password: string) {
+    rememberPasswordRecovery(false);
+    setIsPasswordRecovery(false);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     return { error: error as Error | null };
   }
@@ -90,6 +136,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function signInWithGoogle() {
+    rememberPasswordRecovery(false);
+    setIsPasswordRecovery(false);
     const pendingInvite = sessionStorage.getItem('pending-invite');
     const redirectTo = pendingInvite
       ? `${window.location.origin}/invite/${pendingInvite}`
@@ -111,7 +159,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function updatePassword(password: string) {
     const { error } = await supabase.auth.updateUser({ password });
-    if (!error) setIsPasswordRecovery(false);
     return { error: error as Error | null };
   }
 
@@ -127,6 +174,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function signOut() {
     const { error } = await supabase.auth.signOut();
     if (!error) {
+      rememberPasswordRecovery(false);
+      setIsPasswordRecovery(false);
       setUser(null);
       setSession(null);
     }

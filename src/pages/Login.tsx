@@ -1,11 +1,13 @@
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '../contexts/useAuth';
 import { LoginForm } from '../components/auth/LoginForm';
 import { SpaceBackground } from '../components/dashboard/SpaceBackground';
 
 export function Login() {
-  const { user, loading, postLoginRedirect } = useAuth();
+  const { user, isPasswordRecovery, loading, postLoginRedirect } = useAuth();
+  const location = useLocation();
+  const passwordWasReset = (location.state as { passwordReset?: boolean } | null)?.passwordReset === true;
 
   if (loading) {
     return (
@@ -20,6 +22,7 @@ export function Login() {
   }
 
   if (user) {
+    if (isPasswordRecovery) return <Navigate to="/reset-password" replace />;
     return <Navigate to={postLoginRedirect()} replace />;
   }
 
@@ -76,6 +79,11 @@ export function Login() {
         className="relative z-10 w-full max-w-sm"
       >
         <div className="glass-card p-8">
+          {passwordWasReset && (
+            <div role="status" className="mb-5 rounded-xl border border-green-500/30 bg-green-500/15 p-4 text-sm text-green-200">
+              Password updated. Sign in with your new password.
+            </div>
+          )}
           <LoginForm />
         </div>
       </motion.div>
