@@ -16,7 +16,7 @@ interface InvitationRecord {
   invitee_email: string;
   invitee_role: 'editor' | 'viewer';
   token: string;
-  token_expires_at: string;
+  token_expires_at: string | null;
 }
 
 function appUrl(): URL {
@@ -27,10 +27,19 @@ function appUrl(): URL {
 function corsHeaders(request: Request): Record<string, string> {
   const configuredOrigin = appUrl().origin;
   const requestOrigin = request.headers.get('Origin');
-  const allowedOrigin = requestOrigin === configuredOrigin ? requestOrigin : configuredOrigin;
+
+  const allowedOrigins = new Set([
+    'https://oneabyss.com',
+    'https://onespaceapp.netlify.app',
+  ]);
+
+  const allowedOrigin =
+    requestOrigin && allowedOrigins.has(requestOrigin)
+      ? requestOrigin
+      : configuredOrigin;
 
   return {
-    'Access-Control-Allow-Origin': allowedOrigin || configuredOrigin,
+    'Access-Control-Allow-Origin': allowedOrigin,
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Vary': 'Origin',
@@ -135,7 +144,7 @@ Deno.serve(async (request: Request) => {
         ok: false,
         sent: 0,
         total: inviteeEmails.length,
-        reason: 'No sendable invitations were found. Renew an expired invite or wait before resending it.',
+        reason: 'No sendable invitations were found. Wait before resending or verify that the invitation is still pending.',
       });
     }
 
