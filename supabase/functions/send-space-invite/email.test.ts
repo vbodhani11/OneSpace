@@ -20,6 +20,18 @@ describe('invitation email rendering', () => {
     expect(html).toContain('as a viewer');
   });
 
+  it('describes invitations as valid until accepted or revoked', () => {
+    const html = buildEmailHtml({
+      spaceName: 'Home',
+      inviterName: 'Owner',
+      role: 'editor',
+      invitationUrl: 'https://oneabyss.com/invite/token',
+    });
+
+    expect(html).toContain('remains valid until the invitation is accepted or revoked by the space owner');
+    expect(html).not.toContain('expires after seven days');
+  });
+
   it('removes line breaks from email headers', () => {
     expect(sanitizeEmailHeader('Project\r\nBcc: attacker@example.com')).toBe(
       'Project Bcc: attacker@example.com',
