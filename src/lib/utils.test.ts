@@ -1,10 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { eventOccursOnLocalDate, formatDate } from './utils';
+import { eventOccursOnLocalDate, formatDate, formatFullDate } from './utils';
 import type { CalendarEvent } from '../types/database';
 
 describe('formatDate', () => {
   it('keeps a date-only value on the selected calendar day', () => {
     expect(formatDate('2026-08-14')).toBe('Aug 14, 2026');
+  });
+});
+
+describe('formatFullDate', () => {
+  it('keeps a date-only value on the selected calendar day', () => {
+    expect(formatFullDate('2026-08-14')).toBe('Friday, August 14');
   });
 });
 
