@@ -4,6 +4,7 @@ import { Plus, BookOpen, Trash2, Edit2, Eye } from 'lucide-react';
 import { PageHeader } from '../components/layout/PageHeader';
 import { useJournal } from '../hooks/useJournal';
 import { JournalEditor } from '../components/journal/JournalEditor';
+import { JournalEntryDetailsModal } from '../components/journal/JournalEntryDetailsModal';
 import { TextToSpeechButton } from '../components/journal/TextToSpeechButton';
 import { Modal } from '../components/ui/Modal';
 import { Button } from '../components/ui/Button';
@@ -147,37 +148,7 @@ export function Journal() {
         )}
       </Modal>
 
-      <Modal isOpen={!!viewEntry} onClose={() => setViewEntry(null)} title="Journal entry" size="lg">
-        {viewEntry && (
-          <div className="space-y-5">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs text-white/40">{formatDate(viewEntry.entry_date)}</span>
-              {viewEntry.mood && (
-                <span className="text-xs bg-white/10 px-2 py-0.5 rounded-full text-white/60">{viewEntry.mood}</span>
-              )}
-            </div>
-
-            {viewEntry.title && (
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wider text-white/35 mb-1.5">Title</p>
-                <p className="text-base font-semibold text-white/90 break-words">{viewEntry.title}</p>
-              </div>
-            )}
-
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <p className="text-xs font-medium uppercase tracking-wider text-white/35">Entry</p>
-                <TextToSpeechButton text={viewEntry.content} />
-              </div>
-              <div className="max-h-96 overflow-y-auto rounded-xl border border-white/10 bg-white/5 p-3">
-                <p className="text-sm leading-relaxed text-white/70 whitespace-pre-wrap break-words">
-                  {viewEntry.content}
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-      </Modal>
+      <JournalEntryDetailsModal entry={viewEntry} onClose={() => setViewEntry(null)} />
 
       <ConfirmDialog
         isOpen={!!deleteTarget}

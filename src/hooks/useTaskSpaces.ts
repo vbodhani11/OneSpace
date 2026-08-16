@@ -399,3 +399,150 @@ export function useSpaceDetails(spaceId: string) {
     deleteSharedTask,
   };
 }
+
+export interface CalendarSharedTask extends SharedTask {
+  space_name: string;
+  canEdit: boolean;
+}
+
+/**
+ * Every shared task with a due date across every space the user can see (owned
+ * or accepted membership), for the Calendar's day view. RLS already scopes the
+ * `shared_tasks` select to spaces the user is authorized for, so this reads
+ * cleanly without enumerating space ids up front. Role is resolved the same
+ * way useSpaceDetails does it (owner via task_spaces.owner_id, otherwise the
+ * accepted task_space_members row), just for many spaces at once.
+ */
+export function useSharedTasksForCalendar() {
+  const { user } = useAuth();
+  const [tasks, setTasks] = useState<CalendarSharedTask[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchTasks = useCallback(async () => {
+    if (!user) {
+      setTasks([]);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    const [tasksResult, membershipsResult] = await Promise.all([
+      supabase
+        .from('shared_tasks')
+        .select('*, task_spaces(name, owner_id)')
+        .not('due_date', 'is', null),
+      supabase
+        .from('task_space_members')
+        .select('space_id, role')
+        .eq('user_id', user.id)
+        .eq('status', 'accepted'),
+    ]);
+
+    if (tasksResult.error || membershipsResult.error) {
+      setError(tasksResult.error?.message || membershipsResult.error?.message || 'Failed to load shared tasks.');
+      setLoading(false);
+      return;
+    }
+
+    const roleBySpace = new Map(
+      (membershipsResult.data || []).map((membership) => [
+        membership.space_id as string,
+        membership.role as CollaboratorRole,
+      ]),
+    );
+
+    // The generated Database type has no FK relationships (`Relationships: []`
+    // on every table), so supabase-js can't type this embed and infers an
+    // error type for `task_spaces` instead — cast through `unknown` since the
+    // shape is correct at runtime (PostgREST resolves the embed from the
+    // actual FK regardless of what's declared in our local types).
+    type SharedTaskRow = SharedTask & { task_spaces: { name: string; owner_id: string } | null };
+    const rows = (tasksResult.data || []) as unknown as SharedTaskRow[];
+    const nextTasks: CalendarSharedTask[] = rows.map((row) => {
+      const { task_spaces, ...task } = row;
+      const isOwner = task_spaces?.owner_id === user.id;
+      const role = roleBySpace.get(task.space_id);
+      return {
+        ...task,
+        space_name: task_spaces?.name || 'Shared space',
+        canEdit: isOwner || role === 'editor',
+      };
+    });
+
+    setTasks(nextTasks);
+    setLoading(false);
+  }, [user]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void fetchTasks();
+  }, [fetchTasks]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel(`calendar-shared-tasks:${user.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'shared_tasks' }, () => {
+        void fetchTasks();
+      })
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [fetchTasks, user]);
+
+  function mergeTask(id: string, data: Partial<SharedTask>) {
+    setTasks((previous) => previous.map((task) => (task.id === id ? { ...task, ...data } : task)));
+  }
+
+  async function toggleSharedTask(id: string) {
+    const current = tasks.find((task) => task.id === id);
+    if (!current) return { error: new Error('Task not found') };
+
+    const nextStatus = current.status === 'completed' ? 'active' : 'completed';
+    const { data, error } = await supabase
+      .from('shared_tasks')
+      .update({ status: nextStatus, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (!error && data) mergeTask(id, data as SharedTask);
+    return { error: error as Error | null };
+  }
+
+  async function updateSharedTask(id: string, updates: Partial<SharedTask>) {
+    const { data, error } = await supabase
+      .from('shared_tasks')
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (!error && data) mergeTask(id, data as SharedTask);
+    return { error: error as Error | null };
+  }
+
+  async function deleteSharedTask(id: string) {
+    const { error } = await supabase.from('shared_tasks').delete().eq('id', id);
+    if (!error) {
+      setTasks((previous) => previous.filter((task) => task.id !== id));
+    }
+    return { error: error as Error | null };
+  }
+
+  return {
+    tasks,
+    loading,
+    error,
+    fetchTasks,
+    toggleSharedTask,
+    updateSharedTask,
+    deleteSharedTask,
+  };
+}

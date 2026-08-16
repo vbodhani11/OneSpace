@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CalendarView } from './CalendarView';
 import { toLocalDateKey } from '../../lib/utils';
 import type { CalendarEvent } from '../../types/database';
@@ -31,5 +31,62 @@ describe('CalendarView', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Edit Planning session' }));
     expect(onSelectEvent).toHaveBeenCalledWith(event);
+  });
+
+  describe('task and journal indicators on the month grid', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-08-16T09:00:00'));
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('marks a day with a due task without treating it as an event', () => {
+      render(
+        <CalendarView
+          events={[]}
+          selectedDate="2026-08-01"
+          onSelectDate={vi.fn()}
+          onSelectEvent={vi.fn()}
+          taskDueDates={new Set(['2026-08-16'])}
+        />,
+      );
+
+      const day = screen.getByRole('button', { name: 'Select 2026-08-16, has tasks due' });
+      expect(day).toBeInTheDocument();
+    });
+
+    it('marks a day with a journal entry', () => {
+      render(
+        <CalendarView
+          events={[]}
+          selectedDate="2026-08-01"
+          onSelectDate={vi.fn()}
+          onSelectEvent={vi.fn()}
+          journalDates={new Set(['2026-08-16'])}
+        />,
+      );
+
+      const day = screen.getByRole('button', { name: 'Select 2026-08-16, has a journal entry' });
+      expect(day).toBeInTheDocument();
+    });
+
+    it('combines all three indicators for a day with an event, a task, and a journal entry', () => {
+      render(
+        <CalendarView
+          events={[event]}
+          selectedDate="2026-08-01"
+          onSelectDate={vi.fn()}
+          onSelectEvent={vi.fn()}
+          taskDueDates={new Set(['2026-08-13'])}
+          journalDates={new Set(['2026-08-13'])}
+        />,
+      );
+
+      const day = screen.getByRole('button', { name: 'Select 2026-08-13, has events, tasks due, a journal entry' });
+      expect(day).toBeInTheDocument();
+    });
   });
 });
