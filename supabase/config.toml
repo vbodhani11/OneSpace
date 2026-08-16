@@ -1,6 +1,6 @@
 # Local/branch-safe configuration. Production Auth settings remain managed in
 # Supabase and are intentionally not duplicated or changed by this pull request.
-project_id = "OneSpace"
+project_id = "OneAbyss"
 
 [db]
 major_version = 17

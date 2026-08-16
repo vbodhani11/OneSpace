@@ -52,7 +52,7 @@ export function Login() {
           className="font-brand text-gradient leading-none"
           style={{ fontSize: '2.6rem' }}
         >
-          OneSpace
+          OneAbyss
         </h1>
 
         {/* Shimmer line */}

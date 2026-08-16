@@ -35,7 +35,7 @@ export function Signup() {
           className="font-brand text-gradient leading-none"
           style={{ fontSize: '2.6rem' }}
         >
-          OneSpace
+          OneAbyss
         </h1>
 
         <motion.div

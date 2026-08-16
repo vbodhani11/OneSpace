@@ -1,6 +1,6 @@
-# OneSpace ✦
+# OneAbyss ✦
 
-**OneSpace** is a personal productivity app built for people who want one clean place to manage their tasks, journal their thoughts, and stay on top of their schedule — all wrapped in a beautiful dark space-themed UI.
+**OneAbyss** is a personal productivity app built for people who want one clean place to manage their tasks, journal their thoughts, and stay on top of their schedule — all wrapped in a beautiful dark space-themed UI.
 
 🔗 **Live App:** [https://onespaceapp.netlify.app](https://onespaceapp.netlify.app/login)
 

@@ -12,7 +12,7 @@ export class AppErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error('OneSpace rendering error', error, info.componentStack);
+    console.error('OneAbyss rendering error', error, info.componentStack);
   }
 
   render() {
@@ -20,9 +20,9 @@ export class AppErrorBoundary extends Component<Props, State> {
       return (
         <main className="min-h-screen flex items-center justify-center px-4">
           <div className="glass-card max-w-md p-8 text-center">
-            <h1 className="text-xl font-bold text-white mb-2">OneSpace hit a problem</h1>
+            <h1 className="text-xl font-bold text-white mb-2">OneAbyss hit a problem</h1>
             <p className="text-sm text-white/50 mb-5">Your data is still safe. Reload the app to try again.</p>
-            <Button onClick={() => window.location.reload()}>Reload OneSpace</Button>
+            <Button onClick={() => window.location.reload()}>Reload OneAbyss</Button>
           </div>
         </main>
       );

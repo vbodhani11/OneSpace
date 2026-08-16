@@ -10,7 +10,7 @@ export function AuthPageShell({ children }: { children: React.ReactNode }) {
         animate={{ opacity: 1, y: 0 }}
         className="relative z-10 mb-8 text-center"
       >
-        <p className="font-brand text-gradient text-[2.6rem] leading-none">OneSpace</p>
+        <p className="font-brand text-gradient text-[2.6rem] leading-none">OneAbyss</p>
         <p className="text-white/40 text-sm mt-3">Your all-in-one personal space</p>
       </motion.div>
       <motion.main

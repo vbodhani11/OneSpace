@@ -19,7 +19,7 @@ export function ProtectedRoute() {
           animate={{ opacity: 1 }}
           className="text-white/50 text-sm"
         >
-          Loading OneSpace...
+          Loading OneAbyss...
         </motion.p>
       </div>
     );

@@ -57,7 +57,7 @@ export function Dashboard() {
   return (
     <div className="min-h-screen">
 
-      {/* ── 3-column header: name | OneSpace | button ── */}
+      {/* ── 3-column header: name | OneAbyss | button ── */}
       <div className="grid grid-cols-3 items-center mb-7">
 
         {/* Left — greeting + name */}
@@ -75,7 +75,7 @@ export function Dashboard() {
           </h1>
         </motion.div>
 
-        {/* Center — OneSpace brand */}
+        {/* Center — OneAbyss brand */}
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -105,7 +105,7 @@ export function Dashboard() {
             className="font-brand text-gradient leading-none select-none"
             style={{ fontSize: '1.35rem', letterSpacing: '0.01em' }}
           >
-            OneSpace
+            OneAbyss
           </span>
 
           {/* Underline shimmer */}
