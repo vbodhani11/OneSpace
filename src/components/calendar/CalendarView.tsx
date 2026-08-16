@@ -29,9 +29,20 @@ interface CalendarViewProps {
   selectedDate: string;
   onSelectDate: (date: string) => void;
   onSelectEvent: (event: CalendarEvent) => void;
+  /** Dates ('YYYY-MM-DD') with at least one task due, personal or shared. */
+  taskDueDates?: Set<string>;
+  /** Dates ('YYYY-MM-DD') with at least one journal entry. */
+  journalDates?: Set<string>;
 }
 
-export function CalendarView({ events, selectedDate, onSelectDate, onSelectEvent }: CalendarViewProps) {
+export function CalendarView({
+  events,
+  selectedDate,
+  onSelectDate,
+  onSelectEvent,
+  taskDueDates = new Set(),
+  journalDates = new Set(),
+}: CalendarViewProps) {
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
@@ -56,6 +67,22 @@ export function CalendarView({ events, selectedDate, onSelectDate, onSelectEvent
   function hasEvent(day: number) {
     const dateStr = getDateStr(day);
     return events.some((event) => eventOccursOnLocalDate(event, dateStr));
+  }
+
+  function hasTask(day: number) {
+    return taskDueDates.has(getDateStr(day));
+  }
+
+  function hasJournal(day: number) {
+    return journalDates.has(getDateStr(day));
+  }
+
+  function dayIndicatorLabel(day: number) {
+    const parts: string[] = [];
+    if (hasEvent(day)) parts.push('events');
+    if (hasTask(day)) parts.push('tasks due');
+    if (hasJournal(day)) parts.push('a journal entry');
+    return parts.length > 0 ? `, has ${parts.join(', ')}` : '';
   }
 
   function isToday(day: number) {
@@ -98,7 +125,7 @@ export function CalendarView({ events, selectedDate, onSelectDate, onSelectEvent
               key={day}
               whileTap={{ scale: 0.9 }}
               onClick={() => onSelectDate(getDateStr(day))}
-              aria-label={`Select ${getDateStr(day)}${hasEvent(day) ? ', has events' : ''}`}
+              aria-label={`Select ${getDateStr(day)}${dayIndicatorLabel(day)}`}
               className={`
                 relative flex items-center justify-center h-9 text-sm rounded-xl transition-all duration-200
                 ${isSelected(day)
@@ -110,8 +137,12 @@ export function CalendarView({ events, selectedDate, onSelectDate, onSelectEvent
               `}
             >
               {day}
-              {hasEvent(day) && !isSelected(day) && (
-                <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-accent-cyan" />
+              {!isSelected(day) && (hasEvent(day) || hasTask(day) || hasJournal(day)) && (
+                <span className="absolute bottom-1 left-1/2 -translate-x-1/2 flex items-center gap-0.5">
+                  {hasEvent(day) && <span className="w-1 h-1 rounded-full bg-accent-cyan" />}
+                  {hasTask(day) && <span className="w-1 h-1 rounded-full bg-accent-purple" />}
+                  {hasJournal(day) && <span className="w-1 h-1 rounded-full bg-pink-400" />}
+                </span>
               )}
             </motion.button>
           ))}
