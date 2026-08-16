@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Calendar, Trash2, Edit2, CheckCircle, Circle } from 'lucide-react';
+import { Calendar, Trash2, Edit2, CheckCircle, Circle, Eye } from 'lucide-react';
 import type { Task } from '../../types/database';
 import { formatDate, truncate } from '../../lib/utils';
 import { PriorityBadge } from '../ui/Card';
@@ -17,6 +17,7 @@ interface TaskCardProps {
 }
 
 export function TaskCard({ task, onToggleComplete, onDelete, onUpdate, showActions = true }: TaskCardProps) {
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -88,36 +89,84 @@ export function TaskCard({ task, onToggleComplete, onDelete, onUpdate, showActio
             </div>
           </div>
 
-          {showActions && (
-            <div className="flex items-center gap-1 flex-shrink-0">
-              {onUpdate && (
-                <button
-                  type="button"
-                  onClick={() => setEditOpen(true)}
-                  aria-label={`Edit ${task.title}`}
-                  className="p-1.5 text-white/30 hover:text-white/70 hover:bg-white/10 rounded-lg transition-all"
-                >
-                  <Edit2 size={14} />
-                </button>
-              )}
-              {onDelete && (
-                <button
-                  type="button"
-                  onClick={() => setDeleteOpen(true)}
-                  aria-label={`Delete ${task.title}`}
-                  className="p-1.5 text-white/30 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
-                >
-                  <Trash2 size={14} />
-                </button>
-              )}
-            </div>
-          )}
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <button
+              type="button"
+              onClick={() => setDetailsOpen(true)}
+              aria-label={`View ${task.title} details`}
+              className="p-1.5 text-white/30 hover:text-accent-cyan hover:bg-white/10 rounded-lg transition-all"
+            >
+              <Eye size={14} />
+            </button>
+            {showActions && onUpdate && (
+              <button
+                type="button"
+                onClick={() => setEditOpen(true)}
+                aria-label={`Edit ${task.title}`}
+                className="p-1.5 text-white/30 hover:text-white/70 hover:bg-white/10 rounded-lg transition-all"
+              >
+                <Edit2 size={14} />
+              </button>
+            )}
+            {showActions && onDelete && (
+              <button
+                type="button"
+                onClick={() => setDeleteOpen(true)}
+                aria-label={`Delete ${task.title}`}
+                className="p-1.5 text-white/30 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
+              >
+                <Trash2 size={14} />
+              </button>
+            )}
+          </div>
         </div>
 
         {actionError && (
           <p role="alert" className="mt-3 text-sm text-red-400">{actionError}</p>
         )}
       </motion.div>
+
+      <Modal isOpen={detailsOpen} onClose={() => setDetailsOpen(false)} title="Task details" size="lg">
+        <div className="space-y-5">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wider text-white/35 mb-1.5">Title</p>
+            <p className="text-base font-semibold text-white/90 break-words">{task.title}</p>
+          </div>
+
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wider text-white/35 mb-1.5">Description</p>
+            <div className="max-h-64 overflow-y-auto rounded-xl border border-white/10 bg-white/5 p-3">
+              <p className="text-sm leading-relaxed text-white/75 whitespace-pre-wrap break-words">
+                {task.description || 'No description provided.'}
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+              <p className="text-[11px] font-medium uppercase tracking-wider text-white/35 mb-2">Status</p>
+              <p className="text-sm font-medium text-white/80 capitalize">{task.status}</p>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+              <p className="text-[11px] font-medium uppercase tracking-wider text-white/35 mb-2">Priority</p>
+              <PriorityBadge priority={task.priority} />
+            </div>
+            <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+              <p className="text-[11px] font-medium uppercase tracking-wider text-white/35 mb-2">Due date</p>
+              <p className="flex items-center gap-1.5 text-sm text-white/80">
+                {task.due_date ? (
+                  <>
+                    <Calendar size={13} className="text-white/40" />
+                    {formatDate(task.due_date)}
+                  </>
+                ) : (
+                  'No due date'
+                )}
+              </p>
+            </div>
+          </div>
+        </div>
+      </Modal>
 
       <Modal isOpen={editOpen} onClose={() => setEditOpen(false)} title="Edit task">
         <TaskForm
