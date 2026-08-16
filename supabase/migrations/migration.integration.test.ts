@@ -55,7 +55,7 @@ const invitationDeliveryMigration = readFileSync(
   'utf8',
 );
 const nonExpiringInviteMigration = readFileSync(
-  'supabase/migrations/20260815163500_make_space_invites_non_expiring.sql',
+  'supabase/migrations/20260816023037_make_space_invites_non_expiring.sql',
   'utf8',
 );
 
