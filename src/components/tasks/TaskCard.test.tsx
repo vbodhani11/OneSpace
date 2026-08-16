@@ -13,6 +13,32 @@ const task = {
 };
 
 describe('TaskCard', () => {
+  it('opens a read-only popup with the complete task details', async () => {
+    const user = userEvent.setup();
+    const longDescription = 'Walmart groceries '.repeat(12).trim();
+
+    render(
+      <TaskCard
+        task={{ ...task, description: longDescription }}
+        showActions={false}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'View Bring apples details' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Edit Bring apples' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'View Bring apples details' }));
+
+    const dialog = screen.getByRole('dialog', { name: 'Task details' });
+    expect(dialog).toBeInTheDocument();
+    expect(dialog).toHaveTextContent(longDescription);
+    expect(dialog).toHaveTextContent('medium');
+    expect(dialog).toHaveTextContent('Aug 14, 2026');
+
+    await user.click(screen.getByRole('button', { name: 'Close Task details' }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Task details' })).not.toBeInTheDocument());
+  });
+
   it('lets a user complete, edit, and delete a task', async () => {
     const onToggleComplete = vi.fn().mockResolvedValue(undefined);
     const onUpdate = vi.fn().mockResolvedValue(undefined);
