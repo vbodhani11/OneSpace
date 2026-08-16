@@ -26,15 +26,18 @@ interface JournalEditorProps {
   onSubmit: (data: JournalFormData) => Promise<void>;
   onCancel: () => void;
   submitLabel?: string;
+  /** Starts voice input immediately, for a one-tap "quick voice journal" shortcut. */
+  autoStartRecording?: boolean;
 }
 
-export function JournalEditor({ initialData, onSubmit, onCancel, submitLabel = 'Save entry' }: JournalEditorProps) {
+export function JournalEditor({ initialData, onSubmit, onCancel, submitLabel = 'Save entry', autoStartRecording = false }: JournalEditorProps) {
   const [submitError, setSubmitError] = useState('');
   const [speechLanguage, setSpeechLanguage] = useState(() => navigator.language || 'en-US');
   const {
     register,
     handleSubmit,
     setValue,
+    getValues,
     control,
     formState: { errors, isSubmitting },
   } = useForm<JournalFormData>({
@@ -50,7 +53,11 @@ export function JournalEditor({ initialData, onSubmit, onCancel, submitLabel = '
   const content = useWatch({ control, name: 'content' });
 
   function handleSpeechResult(text: string) {
-    const current = content || '';
+    // Reads the live form value instead of the `content` closure: the speech
+    // recognition callback can fire against a stale render (SpeechToTextButton
+    // binds onresult once per listening session), so relying on the closed-over
+    // `content` would drop everything appended by earlier segments after a pause.
+    const current = getValues('content') || '';
     setValue('content', current + (current ? ' ' : '') + text);
   }
 
@@ -107,7 +114,7 @@ export function JournalEditor({ initialData, onSubmit, onCancel, submitLabel = '
               <option value="hi-IN" className="bg-space-800">Hindi</option>
               <option value="te-IN" className="bg-space-800">Telugu</option>
             </select>
-            <SpeechToTextButton onResult={handleSpeechResult} language={speechLanguage} />
+            <SpeechToTextButton onResult={handleSpeechResult} language={speechLanguage} autoStart={autoStartRecording} />
             <TextToSpeechButton text={content || ''} />
           </div>
         </div>

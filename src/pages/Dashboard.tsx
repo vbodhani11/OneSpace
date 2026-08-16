@@ -8,21 +8,25 @@ import {
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
-import { Plus, Sparkles, Rocket } from 'lucide-react';
+import { Plus, Sparkles, Rocket, Mic } from 'lucide-react';
 import { useAuth } from '../contexts/useAuth';
 import { useTasks } from '../hooks/useTasks';
+import { useJournal } from '../hooks/useJournal';
 import { FloatingTask } from '../components/dashboard/FloatingTask';
 import { TaskBin } from '../components/dashboard/TaskBin';
 import { Modal } from '../components/ui/Modal';
 import { TaskForm } from '../components/tasks/TaskForm';
+import { JournalEditor } from '../components/journal/JournalEditor';
 import { Button } from '../components/ui/Button';
 import { LoadingState, ErrorState } from '../components/ui/Card';
 
 export function Dashboard() {
   const { user } = useAuth();
   const { tasks, loading, error, fetchTasks, toggleTask, createTask } = useTasks('active');
+  const { createEntry } = useJournal();
   const [isDragging, setIsDragging] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [voiceJournalOpen, setVoiceJournalOpen] = useState(false);
   const [actionError, setActionError] = useState('');
 
   const sensors = useSensors(
@@ -117,13 +121,22 @@ export function Dashboard() {
           />
         </motion.div>
 
-        {/* Right — action button */}
+        {/* Right — actions */}
         <motion.div
           initial={{ opacity: 0, x: 16 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.45 }}
-          className="flex justify-end"
+          className="flex justify-end items-center gap-2"
         >
+          <button
+            type="button"
+            onClick={() => setVoiceJournalOpen(true)}
+            aria-label="Start a quick voice journal entry"
+            title="Quick voice journal"
+            className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-white/60 hover:text-accent-cyan hover:bg-white/10 transition-all"
+          >
+            <Mic size={15} />
+          </button>
           <Button onClick={() => setCreateOpen(true)} size="sm">
             <Plus size={15} />
             New task
@@ -204,6 +217,20 @@ export function Dashboard() {
           }}
           onCancel={() => setCreateOpen(false)}
         />
+      </Modal>
+
+      <Modal isOpen={voiceJournalOpen} onClose={() => setVoiceJournalOpen(false)} title="Quick voice journal" size="lg">
+        {voiceJournalOpen && (
+          <JournalEditor
+            autoStartRecording
+            onSubmit={async (data) => {
+              const result = await createEntry(data);
+              if (result.error) throw result.error;
+              setVoiceJournalOpen(false);
+            }}
+            onCancel={() => setVoiceJournalOpen(false)}
+          />
+        )}
       </Modal>
     </div>
   );

@@ -206,6 +206,7 @@
 [data-theme="light"] .text-white\/70    { color: rgba(30,27,75,0.70) !important; }
 [data-theme="light"] .text-white\/60    { color: rgba(30,27,75,0.60) !important; }
 [data-theme="light"] .text-white\/50    { color: rgba(30,27,75,0.55) !important; }
+[data-theme="light"] .text-white\/45    { color: rgba(30,27,75,0.48) !important; }
 [data-theme="light"] .text-white\/40    { color: rgba(30,27,75,0.45) !important; }
 [data-theme="light"] .text-white\/35    { color: rgba(30,27,75,0.38) !important; }
 [data-theme="light"] .text-white\/30    { color: rgba(30,27,75,0.32) !important; }
@@ -217,18 +218,26 @@
 [data-theme="light"] .bg-white\/8  { background-color: rgba(255,255,255,0.85) !important; }
 [data-theme="light"] .bg-white\/10 { background-color: rgba(139,92,246,0.08)  !important; }
 [data-theme="light"] .bg-white\/15 { background-color: rgba(139,92,246,0.12)  !important; }
+[data-theme="light"] .bg-white\/20 { background-color: rgba(139,92,246,0.16)  !important; }
 
 /* Borders */
 [data-theme="light"] .border-white\/5  { border-color: rgba(139,92,246,0.08) !important; }
 [data-theme="light"] .border-white\/8  { border-color: rgba(139,92,246,0.10) !important; }
 [data-theme="light"] .border-white\/10 { border-color: rgba(139,92,246,0.15) !important; }
 [data-theme="light"] .border-white\/20 { border-color: rgba(139,92,246,0.25) !important; }
+[data-theme="light"] .border-white\/30 { border-color: rgba(139,92,246,0.35) !important; }
+[data-theme="light"] .border-t-white   { border-top-color: #1e1b4b !important; }
 
-/* Hover utilities */
+/* Hover & group-hover utilities */
+[data-theme="light"] .hover\:bg-white\/8:hover  { background-color: rgba(139,92,246,0.08) !important; }
 [data-theme="light"] .hover\:bg-white\/10:hover { background-color: rgba(139,92,246,0.10) !important; }
 [data-theme="light"] .hover\:bg-white\/15:hover { background-color: rgba(139,92,246,0.15) !important; }
+[data-theme="light"] .hover\:text-white:hover     { color: #1e1b4b !important; }
+[data-theme="light"] .hover\:text-white\/60:hover { color: rgba(30,27,75,0.60) !important; }
 [data-theme="light"] .hover\:text-white\/70:hover { color: rgba(30,27,75,0.75) !important; }
 [data-theme="light"] .hover\:text-white\/80:hover { color: rgba(30,27,75,0.85) !important; }
+[data-theme="light"] .hover\:text-white\/90:hover { color: rgba(30,27,75,0.90) !important; }
+[data-theme="light"] .group:hover .group-hover\:text-white\/60 { color: rgba(30,27,75,0.60) !important; }
 
 /* Nav & header in light mode */
 [data-theme="light"] nav .rounded-t-2xl {

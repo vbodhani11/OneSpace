@@ -117,9 +117,10 @@ export function Profile() {
   }
 
   async function changeTheme(value: Theme) {
-    setActionStatus('Saving theme…');
+    // Theme switches instantly with no confirmation message; only surface a
+    // message if persisting the choice actually fails.
     const result = await setTheme(value);
-    setActionStatus(result.error ? result.error.message : 'Theme saved.');
+    if (result.error) setActionStatus(result.error.message);
   }
 
   const displayName = profile?.full_name || user?.user_metadata?.full_name || '';
