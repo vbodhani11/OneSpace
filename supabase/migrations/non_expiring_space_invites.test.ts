@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const migration = readFileSync(
-  'supabase/migrations/20260815163500_make_space_invites_non_expiring.sql',
+  'supabase/migrations/20260816023037_make_space_invites_non_expiring.sql',
   'utf8',
 );
 
