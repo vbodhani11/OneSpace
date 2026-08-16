@@ -137,9 +137,10 @@ export function Dashboard() {
           >
             <Mic size={15} />
           </button>
-          <Button onClick={() => setCreateOpen(true)} size="sm">
+          <Button onClick={() => setCreateOpen(true)} size="sm" className="whitespace-nowrap">
             <Plus size={15} />
-            New task
+            <span className="hidden sm:inline">New task</span>
+            <span className="sm:hidden">New</span>
           </Button>
         </motion.div>
       </div>
