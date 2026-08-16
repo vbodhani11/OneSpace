@@ -136,7 +136,7 @@ export function TaskCard({ task, onToggleComplete, onDelete, onUpdate, showActio
           <div>
             <p className="text-xs font-medium uppercase tracking-wider text-white/35 mb-1.5">Description</p>
             <div className="max-h-64 overflow-y-auto rounded-xl border border-white/10 bg-white/5 p-3">
-              <p className="text-sm leading-relaxed text-white/75 whitespace-pre-wrap break-words">
+              <p className="text-sm leading-relaxed text-white/70 whitespace-pre-wrap break-words">
                 {task.description || 'No description provided.'}
               </p>
             </div>
