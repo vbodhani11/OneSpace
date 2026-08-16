@@ -5,6 +5,8 @@ import { Mic, MicOff, AlertCircle } from 'lucide-react';
 interface SpeechToTextButtonProps {
   onResult: (text: string) => void;
   language?: string;
+  /** Starts listening as soon as the button mounts, e.g. for a "record now" shortcut. */
+  autoStart?: boolean;
 }
 
 interface SpeechRecognitionEvent extends Event {
@@ -35,13 +37,21 @@ declare global {
   }
 }
 
-export function SpeechToTextButton({ onResult, language = navigator.language || 'en-US' }: SpeechToTextButtonProps) {
+export function SpeechToTextButton({ onResult, language = navigator.language || 'en-US', autoStart = false }: SpeechToTextButtonProps) {
   const [isListening, setIsListening] = useState(false);
   const [speechError, setSpeechError] = useState('');
   const [isSupported] = useState(() =>
     'SpeechRecognition' in window || 'webkitSpeechRecognition' in window
   );
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  // recognition.onresult is bound once per listening session in startListening(),
+  // so it would otherwise close over a stale onResult from that render. Routing
+  // through a ref kept in sync on every render means each result always calls
+  // whatever onResult is current, not whichever one was live when listening began.
+  const onResultRef = useRef(onResult);
+  useEffect(() => {
+    onResultRef.current = onResult;
+  });
 
   useEffect(() => () => {
     recognitionRef.current?.abort();
@@ -63,7 +73,7 @@ export function SpeechToTextButton({ onResult, language = navigator.language || 
       for (let i = event.resultIndex; i < event.results.length; i++) {
         transcript += event.results[i][0].transcript;
       }
-      onResult(transcript);
+      onResultRef.current(transcript);
     };
 
     recognition.onerror = (event) => {
@@ -91,6 +101,16 @@ export function SpeechToTextButton({ onResult, language = navigator.language || 
     recognitionRef.current?.stop();
     setIsListening(false);
   }
+
+  useEffect(() => {
+    // Intentionally mount-only: this is an opt-in "record immediately" shortcut,
+    // not something that should restart every time a prop reference changes.
+    if (autoStart && isSupported) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      startListening();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (!isSupported) {
     return (

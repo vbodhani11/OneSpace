@@ -40,31 +40,27 @@ export function TextToSpeechButton({ text }: TextToSpeechButtonProps) {
       onClick={isSpeaking ? stop : speak}
       disabled={!text.trim()}
       aria-pressed={isSpeaking}
+      aria-label={isSpeaking ? 'Stop reading aloud' : 'Read aloud'}
+      title={isSpeaking ? 'Stop reading aloud' : 'Read aloud'}
       className={`
-        flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200
+        p-1.5 rounded-lg transition-all
         disabled:opacity-40 disabled:cursor-not-allowed
         ${isSpeaking
-          ? 'bg-accent-cyan/20 border border-accent-cyan/40 text-accent-cyan'
-          : 'bg-white/5 border border-white/10 text-white/60 hover:text-white/90 hover:bg-white/10'
+          ? 'text-accent-cyan bg-accent-cyan/10 hover:bg-accent-cyan/20'
+          : 'text-white/30 hover:text-accent-cyan hover:bg-white/10'
         }
       `}
-      whileTap={{ scale: 0.95 }}
+      whileTap={{ scale: 0.9 }}
     >
       {isSpeaking ? (
-        <>
-          <motion.div
-            animate={{ scale: [1, 1.2, 1] }}
-            transition={{ duration: 0.8, repeat: Infinity }}
-          >
-            <VolumeX size={15} />
-          </motion.div>
-          Stop
-        </>
+        <motion.div
+          animate={{ scale: [1, 1.2, 1] }}
+          transition={{ duration: 0.8, repeat: Infinity }}
+        >
+          <VolumeX size={14} />
+        </motion.div>
       ) : (
-        <>
-          <Volume2 size={15} />
-          Read aloud
-        </>
+        <Volume2 size={14} />
       )}
     </motion.button>
   );
