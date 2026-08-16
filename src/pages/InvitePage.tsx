@@ -120,7 +120,7 @@ export function InvitePage() {
               <AlertCircle size={26} className="text-red-400" />
             </div>
             <h2 className="text-lg font-bold text-white mb-2">Invitation not found</h2>
-            <p className="text-white/40 text-sm mb-5">This invitation is invalid, expired, or has been revoked.</p>
+            <p className="text-white/40 text-sm mb-5">This invitation is invalid or has been revoked.</p>
             <Button onClick={() => navigate('/dashboard')} className="w-full">Go to app</Button>
           </div>
         )}

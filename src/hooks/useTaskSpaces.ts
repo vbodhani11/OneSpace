@@ -299,8 +299,7 @@ export function useSpaceDetails(spaceId: string) {
         if (roleError) return { error: roleError as Error };
       }
 
-      const expired = !existing.expires_at || new Date(existing.expires_at).getTime() <= Date.now();
-      if (!existing.invite_token || expired || existing.invite_send_count >= 5) {
+      if (!existing.invite_token || existing.invite_send_count >= 5) {
         const { error: renewalError } = await supabase.rpc('renew_space_invite', {
           p_member_id: existing.id,
         });
