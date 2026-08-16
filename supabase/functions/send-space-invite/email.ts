@@ -39,7 +39,7 @@ export function buildEmailHtml({
   <table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 20px;">
     <tr><td align="center">
       <table width="560" cellpadding="0" cellspacing="0" style="background:#151526;border:1px solid #2c2c45;border-radius:20px;padding:40px 36px;max-width:560px;">
-        <tr><td style="text-align:center;padding-bottom:28px;color:#a78bfa;font-size:28px;font-weight:900;">OneSpace</td></tr>
+        <tr><td style="text-align:center;padding-bottom:28px;color:#a78bfa;font-size:28px;font-weight:900;">OneAbyss</td></tr>
         <tr><td style="text-align:center;padding-bottom:20px;">
           <h1 style="margin:0;font-size:22px;font-weight:700;color:#f1f5f9;">You've been invited</h1>
           <p style="margin:12px 0 0;color:#94a3b8;font-size:15px;line-height:1.6;">

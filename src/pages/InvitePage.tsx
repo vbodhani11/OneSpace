@@ -99,7 +99,7 @@ export function InvitePage() {
         animate={{ opacity: 1, y: 0 }}
         className="absolute top-8 left-0 right-0 flex justify-center"
       >
-        <span className="font-brand text-gradient" style={{ fontSize: '1.6rem' }}>OneSpace</span>
+        <span className="font-brand text-gradient" style={{ fontSize: '1.6rem' }}>OneAbyss</span>
       </motion.div>
 
       <motion.div

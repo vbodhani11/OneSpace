@@ -16,7 +16,7 @@ export function PageHeader({ title, subtitle, action }: PageHeaderProps) {
         {subtitle && <p className="text-white/40 text-xs mt-0.5">{subtitle}</p>}
       </motion.div>
 
-      {/* Center — OneSpace brand */}
+      {/* Center — OneAbyss brand */}
       <motion.div
         initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
@@ -35,7 +35,7 @@ export function PageHeader({ title, subtitle, action }: PageHeaderProps) {
           className="font-brand text-gradient leading-none select-none"
           style={{ fontSize: '1.25rem' }}
         >
-          OneSpace
+          OneAbyss
         </span>
         <motion.div
           className="h-px w-14 mt-0.5 rounded-full"

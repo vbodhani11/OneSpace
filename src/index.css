@@ -75,6 +75,7 @@
     min-height: 100vh;
     color: var(--text-base);
     overflow-x: hidden;
+    overscroll-behavior-y: contain;
     transition: background 0.4s ease, color 0.3s ease;
   }
 

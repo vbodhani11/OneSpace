@@ -22,7 +22,7 @@ export function AppHeader() {
           >
             <Sparkles size={16} className="text-accent-purple" />
           </motion.div>
-          <span className="text-gradient font-bold text-lg tracking-tight">OneSpace</span>
+          <span className="text-gradient font-bold text-lg tracking-tight">OneAbyss</span>
           <motion.div
             animate={{ rotate: [360, 0] }}
             transition={{ duration: 18, repeat: Infinity, ease: 'linear' }}

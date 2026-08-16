@@ -153,7 +153,7 @@ Deno.serve(async (request: Request) => {
       .select('full_name')
       .eq('id', user.id)
       .maybeSingle();
-    const inviterName = profile?.full_name || user.email || 'A OneSpace user';
+    const inviterName = profile?.full_name || user.email || 'A OneAbyss user';
     const safeSubjectInviter = sanitizeEmailHeader(inviterName);
     const safeSubjectSpace = sanitizeEmailHeader(space.name);
 
@@ -170,7 +170,7 @@ Deno.serve(async (request: Request) => {
           body: JSON.stringify({
             from: resendFromEmail,
             to: [invitation.invitee_email],
-            subject: `${safeSubjectInviter} invited you to "${safeSubjectSpace}" on OneSpace`,
+            subject: `${safeSubjectInviter} invited you to "${safeSubjectSpace}" on OneAbyss`,
             html: buildEmailHtml({
               spaceName: space.name,
               inviterName,
